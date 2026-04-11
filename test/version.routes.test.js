@@ -34,22 +34,22 @@ function createSupabaseClient({ currentValue, updatedValue }) {
   };
 }
 
-test('GET /getVersion returns the current version_id', async () => {
+test('GET /version returns the current version_id', async () => {
   const app = createApp({
     supabaseClient: createSupabaseClient({ currentValue: 7 }),
   });
 
-  const response = await request(app).get('/getVersion').expect(200);
+  const response = await request(app).get('/version').expect(200);
 
   assert.deepEqual(response.body, { version_id: 7 });
 });
 
-test('POST /updateVersion increments and returns the version_id', async () => {
+test('POST /version/update increments and returns the version_id', async () => {
   const app = createApp({
     supabaseClient: createSupabaseClient({ currentValue: 7, updatedValue: 8 }),
   });
 
-  const response = await request(app).post('/updateVersion').expect(200);
+  const response = await request(app).post('/version/update').expect(200);
 
   assert.deepEqual(response.body, { version_id: 8 });
 });

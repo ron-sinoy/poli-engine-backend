@@ -6,7 +6,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 
 const router = express.Router();
 
-router.get('/getVersion', asyncHandler(versionController.getVersion));
-router.post('/updateVersion', asyncHandler(versionController.updateVersion));
+router.get('/version', asyncHandler(versionController.getVersion));
+router.post('/version/update', asyncHandler(versionController.updateVersion));
 
 module.exports = router;

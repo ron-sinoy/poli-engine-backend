@@ -1,0 +1,207 @@
+'use strict';
+
+const { AppError } = require('../errors/AppError');
+const threadRepository = require('../repositories/thread.repository');
+
+function unique(values) {
+  return [...new Set(values.filter((value) => value !== null && value !== undefined))];
+}
+
+function indexBy(rows, key) {
+  return new Map(rows.map((row) => [row[key], row]));
+}
+
+function groupBy(rows, key) {
+  return rows.reduce((groups, row) => {
+    const groupKey = row[key];
+    const group = groups.get(groupKey) || [];
+    group.push(row);
+    groups.set(groupKey, group);
+    return groups;
+  }, new Map());
+}
+
+function publicPerson(person) {
+  if (!person) {
+    return null;
+  }
+
+  return {
+    name: person.name,
+    photo_url: person.photo_url,
+  };
+}
+
+async function readOrFail(operation, failureMessage) {
+  const { data, error } = await operation;
+
+  if (error) {
+    throw new AppError(502, failureMessage, error);
+  }
+
+  return data || [];
+}
+
+async function loadThreadsList({ supabaseClient }) {
+  const { data, error } = await threadRepository.loadThreadsList({ supabaseClient });
+
+  if (error) {
+    throw new AppError(502, 'Failed to load threads from Supabase', error);
+  }
+
+  return data || [];
+}
+
+async function getThreadById({ supabaseClient, threadId }) {
+  const { data: thread, error: threadError } = await threadRepository.getThreadById({
+    supabaseClient,
+    threadId,
+  });
+
+  if (threadError) {
+    throw new AppError(502, 'Failed to load thread from Supabase', threadError);
+  }
+
+  if (!thread) {
+    throw new AppError(404, 'Thread not found');
+  }
+
+  const timelineEntries = await readOrFail(
+    threadRepository.loadTimelineEntries({ supabaseClient, threadId }),
+    'Failed to load timeline entries from Supabase'
+  );
+  const incidentEntryIds = timelineEntries
+    .filter((entry) => entry.entry_type === 'incident')
+    .map((entry) => entry.entry_id);
+  const quoteEntryIds = timelineEntries
+    .filter((entry) => entry.entry_type === 'quote')
+    .map((entry) => entry.entry_id);
+
+  const [incidents, quotes, incidentPersons, quotePersons] = await Promise.all([
+    incidentEntryIds.length
+      ? readOrFail(
+          threadRepository.loadIncidentsByEntryIds({ supabaseClient, entryIds: incidentEntryIds }),
+          'Failed to load incidents from Supabase'
+        )
+      : [],
+    quoteEntryIds.length
+      ? readOrFail(
+          threadRepository.loadQuotesByEntryIds({ supabaseClient, entryIds: quoteEntryIds }),
+          'Failed to load quotes from Supabase'
+        )
+      : [],
+    incidentEntryIds.length
+      ? readOrFail(
+          threadRepository.loadIncidentPersonsByEntryIds({
+            supabaseClient,
+            entryIds: incidentEntryIds,
+          }),
+          'Failed to load incident persons from Supabase'
+        )
+      : [],
+    quoteEntryIds.length
+      ? readOrFail(
+          threadRepository.loadQuotePersonsByEntryIds({ supabaseClient, entryIds: quoteEntryIds }),
+          'Failed to load quote persons from Supabase'
+        )
+      : [],
+  ]);
+
+  const speakerIds = quotes.map((quote) => quote.speaker_id);
+  const involvedPersonIds = [...incidentPersons, ...quotePersons].map((row) => row.person_id);
+  const personIds = unique([...speakerIds, ...involvedPersonIds]);
+  const persons = personIds.length
+    ? await readOrFail(
+        threadRepository.loadPersonsByIds({
+          supabaseClient,
+          personIds,
+        }),
+        'Failed to load persons from Supabase'
+      )
+    : [];
+
+  const politicianIds = unique(persons.map((person) => person.politician_id));
+  const politicians = politicianIds.length
+    ? await readOrFail(
+        threadRepository.loadPoliticiansByIds({ supabaseClient, politicianIds }),
+        'Failed to load politicians from Supabase'
+      )
+    : [];
+
+  const partyIds = unique(politicians.map((politician) => politician.party_id));
+  const parties = partyIds.length
+    ? await readOrFail(
+        threadRepository.loadPartiesByIds({ supabaseClient, partyIds }),
+        'Failed to load parties from Supabase'
+      )
+    : [];
+
+  const allianceIds = unique(parties.map((party) => party.alliance_id));
+  const alliances = allianceIds.length
+    ? await readOrFail(
+        threadRepository.loadAlliancesByIds({ supabaseClient, allianceIds }),
+        'Failed to load alliances from Supabase'
+      )
+    : [];
+
+  const incidentsByEntryId = indexBy(incidents, 'entry_id');
+  const quotesByEntryId = indexBy(quotes, 'entry_id');
+  const incidentPersonsByEntryId = groupBy(incidentPersons, 'entry_id');
+  const quotePersonsByEntryId = groupBy(quotePersons, 'entry_id');
+  const personsById = indexBy(persons, 'person_id');
+  const politiciansById = indexBy(politicians, 'politician_id');
+  const partiesById = indexBy(parties, 'party_id');
+  const alliancesById = indexBy(alliances, 'alliance_id');
+
+  const entries = timelineEntries.map((entry) => {
+    const baseEntry = {
+      entry_type: entry.entry_type,
+      position: entry.position,
+      published_at: entry.published_at,
+    };
+
+    if (entry.entry_type === 'incident') {
+      return {
+        ...baseEntry,
+        body: incidentsByEntryId.get(entry.entry_id)?.body ?? null,
+        persons_involved: (incidentPersonsByEntryId.get(entry.entry_id) || [])
+          .map((row) => publicPerson(personsById.get(row.person_id)))
+          .filter(Boolean),
+      };
+    }
+
+    if (entry.entry_type === 'quote') {
+      const quote = quotesByEntryId.get(entry.entry_id);
+      const speaker = personsById.get(quote?.speaker_id);
+      const politician = politiciansById.get(speaker?.politician_id);
+      const party = partiesById.get(politician?.party_id);
+      const alliance = alliancesById.get(party?.alliance_id);
+
+      return {
+        ...baseEntry,
+        quote_text: quote?.quote_text ?? null,
+        speaker: speaker
+          ? {
+              name: speaker.name,
+              photo_url: speaker.photo_url,
+              alliance: {
+                color: alliance?.color ?? null,
+              },
+            }
+          : null,
+        persons_involved: (quotePersonsByEntryId.get(entry.entry_id) || [])
+          .map((row) => publicPerson(personsById.get(row.person_id)))
+          .filter(Boolean),
+      };
+    }
+
+    return baseEntry;
+  });
+
+  return {
+    ...thread,
+    timeline_entries: entries,
+  };
+}
+
+module.exports = { loadThreadsList, getThreadById };
