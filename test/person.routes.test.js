@@ -5,7 +5,7 @@ const test = require('node:test');
 const { createApp } = require('../src/app');
 const { invokeApp } = require('../test_utils/invokeApp');
 
-function createPartyRouteClient({ insertedPartyId = 12, currentValue = 7, updatedValue = 8 }) {
+function createPersonRouteClient({ politicianId = 21, personId = 7 }) {
   return {
     from(tableName) {
       return {
@@ -28,15 +28,22 @@ function createPartyRouteClient({ insertedPartyId = 12, currentValue = 7, update
           return this;
         },
         async maybeSingle() {
-          if (tableName === 'parties') {
+          if (tableName === 'politicians') {
             return {
-              data: { party_id: insertedPartyId },
+              data: { politician_id: politicianId },
+              error: null,
+            };
+          }
+
+          if (tableName === 'persons') {
+            return {
+              data: { person_id: personId },
               error: null,
             };
           }
 
           return {
-            data: { value: this.wasUpdated ? updatedValue : currentValue },
+            data: { value: this.wasUpdated ? 8 : 7 },
             error: null,
           };
         },
@@ -45,47 +52,45 @@ function createPartyRouteClient({ insertedPartyId = 12, currentValue = 7, update
   };
 }
 
-test('POST /parties inserts a party and returns the new party_id', async () => {
+test('POST /persons inserts a person and returns the new person_id', async () => {
   const app = createApp({
-    supabaseClient: createPartyRouteClient({ insertedPartyId: 12 }),
+    supabaseClient: createPersonRouteClient({ personId: 7 }),
   });
 
   const response = await invokeApp(app, {
     method: 'POST',
-    url: '/parties',
+    url: '/persons',
     body: {
-      name: 'Indian National Congress',
-      logo_url: 'https://example.com/inc.png',
-      alliance_id: 3,
-      abbreviation: 'INC',
+      name: 'Analyst',
+      photo_url: 'https://example.com/analyst.png',
+      isPolitician: false,
     },
   });
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, {
     success: true,
-    party_id: 12,
+    person_id: 7,
   });
 });
 
-test('POST /parties returns validation errors for invalid payloads', async () => {
+test('POST /persons returns validation errors for invalid payloads', async () => {
   const app = createApp({
-    supabaseClient: createPartyRouteClient({ insertedPartyId: 12 }),
+    supabaseClient: createPersonRouteClient({ personId: 7 }),
   });
 
   const response = await invokeApp(app, {
     method: 'POST',
-    url: '/parties',
+    url: '/persons',
     body: {
-      name: 'Indian National Congress',
-      logo_url: 'https://example.com/inc.png',
-      alliance_id: 'bad',
-      abbreviation: 'INC',
+      name: 'Analyst',
+      photo_url: 'https://example.com/analyst.png',
+      isPolitician: 'yes',
     },
   });
 
   assert.equal(response.statusCode, 422);
   assert.deepEqual(response.body, {
-    error: 'alliance_id must be an integer',
+    error: 'isPolitician must be a boolean',
   });
 });

@@ -17,6 +17,19 @@ async function loadThreadsList(request, response) {
   response.json(threads);
 }
 
+async function insertThread(request, response) {
+  const threadId = await threadService.insertThread({
+    supabaseClient: resolveSupabaseClient(request),
+    payload: request.body,
+    versionService: require('../services/version.service'),
+  });
+
+  response.json({
+    success: true,
+    thread_id: threadId,
+  });
+}
+
 async function getThreadById(request, response) {
   const thread = await threadService.getThreadById({
     supabaseClient: resolveSupabaseClient(request),
@@ -26,4 +39,4 @@ async function getThreadById(request, response) {
   response.json(thread);
 }
 
-module.exports = { loadThreadsList, getThreadById };
+module.exports = { loadThreadsList, insertThread, getThreadById };

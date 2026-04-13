@@ -32,6 +32,14 @@ function publicPerson(person) {
   };
 }
 
+function requireNonEmptyString(value, fieldName) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new AppError(422, `${fieldName} is required`);
+  }
+
+  return value.trim();
+}
+
 async function readOrFail(operation, failureMessage) {
   const { data, error } = await operation;
 
@@ -50,6 +58,34 @@ async function loadThreadsList({ supabaseClient }) {
   }
 
   return data || [];
+}
+
+async function insertThread({ supabaseClient, payload, versionService }) {
+  const title = requireNonEmptyString(payload?.title, 'title');
+  const summary = requireNonEmptyString(payload?.summary, 'summary');
+  const timestamp = new Date().toISOString();
+  const { data, error } = await threadRepository.insertThread({
+    supabaseClient,
+    thread: {
+      title,
+      summary,
+      created_at: timestamp,
+      updated_at: null,
+      current_position: 0,
+    },
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to insert thread into Supabase', error);
+  }
+
+  if (!data) {
+    throw new AppError(502, 'Failed to insert thread into Supabase');
+  }
+
+  await versionService.updateVersion({ supabaseClient });
+
+  return data.thread_id;
 }
 
 async function getThreadById({ supabaseClient, threadId }) {
@@ -204,4 +240,4 @@ async function getThreadById({ supabaseClient, threadId }) {
   };
 }
 
-module.exports = { loadThreadsList, getThreadById };
+module.exports = { loadThreadsList, insertThread, getThreadById };

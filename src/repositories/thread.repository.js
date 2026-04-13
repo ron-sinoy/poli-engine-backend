@@ -3,6 +3,7 @@
 const THREADS_TABLE = 'threads';
 const THREAD_LIST_COLUMNS = 'thread_id,title,summary,updated_at';
 const THREAD_DETAIL_COLUMNS = 'thread_id,title,summary,updated_at';
+const THREAD_PROGRESS_COLUMNS = 'thread_id,current_position';
 
 // Keep the thread-list query in one place so future thread reads can evolve separately.
 async function loadThreadsList({ supabaseClient }) {
@@ -12,11 +13,42 @@ async function loadThreadsList({ supabaseClient }) {
     .order('updated_at', { ascending: false });
 }
 
+async function insertThread({ supabaseClient, thread }) {
+  return supabaseClient
+    .from(THREADS_TABLE)
+    .insert(thread)
+    .select('thread_id')
+    .limit(1)
+    .maybeSingle();
+}
+
 async function getThreadById({ supabaseClient, threadId }) {
   return supabaseClient
     .from(THREADS_TABLE)
     .select(THREAD_DETAIL_COLUMNS)
     .eq('thread_id', threadId)
+    .limit(1)
+    .maybeSingle();
+}
+
+async function getThreadProgressById({ supabaseClient, threadId }) {
+  return supabaseClient
+    .from(THREADS_TABLE)
+    .select(THREAD_PROGRESS_COLUMNS)
+    .eq('thread_id', threadId)
+    .limit(1)
+    .maybeSingle();
+}
+
+async function updateThreadProgress({ supabaseClient, threadId, updatedAt, currentPosition }) {
+  return supabaseClient
+    .from(THREADS_TABLE)
+    .update({
+      updated_at: updatedAt,
+      current_position: currentPosition,
+    })
+    .eq('thread_id', threadId)
+    .select(THREAD_PROGRESS_COLUMNS)
     .limit(1)
     .maybeSingle();
 }
@@ -72,7 +104,10 @@ async function loadAlliancesByIds({ supabaseClient, allianceIds }) {
 
 module.exports = {
   loadThreadsList,
+  insertThread,
   getThreadById,
+  getThreadProgressById,
+  updateThreadProgress,
   loadTimelineEntries,
   loadIncidentsByEntryIds,
   loadQuotesByEntryIds,

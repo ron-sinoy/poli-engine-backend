@@ -37,3 +37,6 @@
 - [P17] Implemented internal `insertParty` flow with public `POST /party`, Supabase `parties` insert, shared `updateVersion` reuse, and response `{ success: true, party_id }`.
 - [P17] Added party service and route tests covering success, validation, insert failure, and version bump failure paths.
 - [P17] Reworked route tests to use in-process Express invocation instead of socket binding so the backend test suite runs inside the current sandbox.
+- [P18] Added write endpoints for `POST /threads`, `POST /persons`, `POST /quotes`, and `POST /incidents` using controller-service-repository modules and shared `updateVersion` reuse.
+- [P18] Corrected the public party creation route to `POST /parties` and updated tests to match the current `AGENTS.md` REST plural-noun contract.
+- [P18] Added service and route tests for thread, person, quote, and incident insert flows; verified backend tests pass: 14 passed, 0 failed.

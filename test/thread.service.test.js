@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
-const { getThreadById, loadThreadsList } = require('../src/services/thread.service');
+const { getThreadById, insertThread, loadThreadsList } = require('../src/services/thread.service');
 
 function createThreadsClient({ data, error = null }) {
   const calls = [];
@@ -69,6 +69,148 @@ test('loadThreadsList maps Supabase failures to AppError', async () => {
 
   await assert.rejects(
     () => loadThreadsList({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+function createInsertThreadClient({ insertedThreadId = 5, insertError = null, updateError = null }) {
+  const calls = [];
+
+  return {
+    calls,
+    from(tableName) {
+      calls.push(['from', tableName]);
+      return {
+        tableName,
+        wasUpdated: false,
+        insert(payload) {
+          calls.push(['insert', tableName, payload]);
+          return this;
+        },
+        select(columns) {
+          calls.push(['select', tableName, columns]);
+          return this;
+        },
+        limit(count) {
+          calls.push(['limit', tableName, count]);
+          return this;
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return this;
+        },
+        update(payload) {
+          this.wasUpdated = true;
+          calls.push(['update', tableName, payload]);
+          return this;
+        },
+        async maybeSingle() {
+          calls.push(['maybeSingle', tableName]);
+
+          if (tableName === 'threads') {
+            return {
+              data: insertedThreadId === null ? null : { thread_id: insertedThreadId },
+              error: insertError,
+            };
+          }
+
+          return {
+            data: this.wasUpdated ? { value: 8 } : { value: 7 },
+            error: updateError,
+          };
+        },
+      };
+    },
+  };
+}
+
+test('insertThread inserts a thread and then increments version_id', async () => {
+  const supabaseClient = createInsertThreadClient({});
+
+  const threadId = await insertThread({
+    supabaseClient,
+    payload: {
+      title: 'Thread title',
+      summary: 'Thread summary',
+    },
+    versionService: {
+      updateVersion({ supabaseClient: suppliedClient }) {
+        return require('../src/services/version.service').updateVersion({
+          supabaseClient: suppliedClient,
+        });
+      },
+    },
+  });
+
+  assert.equal(threadId, 5);
+  assert.deepEqual(supabaseClient.calls[0], ['from', 'threads']);
+  assert.deepEqual(supabaseClient.calls[1][0], 'insert');
+  assert.equal(supabaseClient.calls[1][1], 'threads');
+  assert.equal(supabaseClient.calls[1][2].title, 'Thread title');
+  assert.equal(supabaseClient.calls[1][2].summary, 'Thread summary');
+  assert.equal(supabaseClient.calls[1][2].updated_at, null);
+  assert.equal(supabaseClient.calls[1][2].current_position, 0);
+  assert.equal(typeof supabaseClient.calls[1][2].created_at, 'string');
+  assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'version_log'));
+});
+
+test('insertThread rejects missing title', async () => {
+  const supabaseClient = createInsertThreadClient({});
+
+  await assert.rejects(
+    () =>
+      insertThread({
+        supabaseClient,
+        payload: {
+          title: '',
+          summary: 'Thread summary',
+        },
+        versionService: { updateVersion() {} },
+      }),
+    (error) => error instanceof AppError && error.statusCode === 422 && error.message === 'title is required'
+  );
+});
+
+test('insertThread maps Supabase insert failures to AppError', async () => {
+  const supabaseClient = createInsertThreadClient({
+    insertError: { message: 'insert failed' },
+  });
+
+  await assert.rejects(
+    () =>
+      insertThread({
+        supabaseClient,
+        payload: {
+          title: 'Thread title',
+          summary: 'Thread summary',
+        },
+        versionService: { updateVersion() {} },
+      }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('insertThread surfaces version update failures after a successful insert', async () => {
+  const supabaseClient = createInsertThreadClient({
+    updateError: { message: 'update failed' },
+  });
+
+  await assert.rejects(
+    () =>
+      insertThread({
+        supabaseClient,
+        payload: {
+          title: 'Thread title',
+          summary: 'Thread summary',
+        },
+        versionService: {
+          updateVersion({ supabaseClient: suppliedClient }) {
+            return require('../src/services/version.service').updateVersion({
+              supabaseClient: suppliedClient,
+            });
+          },
+        },
+      }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

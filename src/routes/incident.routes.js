@@ -1,11 +1,11 @@
 'use strict';
 
 const express = require('express');
-const partyController = require('../controllers/party.controller');
+const incidentController = require('../controllers/incident.controller');
 const { asyncHandler } = require('../middleware/asyncHandler');
 
 const router = express.Router();
 
-router.post('/parties', asyncHandler(partyController.insertParty));
+router.post('/incidents', asyncHandler(incidentController.insertIncident));
 
 module.exports = router;

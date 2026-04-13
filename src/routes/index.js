@@ -2,7 +2,10 @@
 
 const express = require('express');
 const cacheRoutes = require('./cache.routes');
+const incidentRoutes = require('./incident.routes');
 const partyRoutes = require('./party.routes');
+const personRoutes = require('./person.routes');
+const quoteRoutes = require('./quote.routes');
 const threadRoutes = require('./thread.routes');
 const versionRoutes = require('./version.routes');
 
@@ -13,7 +16,10 @@ router.get('/health', (request, response) => {
 });
 
 router.use(cacheRoutes);
+router.use(incidentRoutes);
 router.use(partyRoutes);
+router.use(personRoutes);
+router.use(quoteRoutes);
 router.use(threadRoutes);
 router.use(versionRoutes);
 

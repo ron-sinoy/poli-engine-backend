@@ -20,6 +20,87 @@ function createThreadsClient({ data, error = null }) {
   };
 }
 
+function createInsertThreadRouteClient({ insertedThreadId = 5 }) {
+  return {
+    from(tableName) {
+      return {
+        tableName,
+        wasUpdated: false,
+        insert() {
+          return this;
+        },
+        update() {
+          this.wasUpdated = true;
+          return this;
+        },
+        select() {
+          return this;
+        },
+        eq() {
+          return this;
+        },
+        limit() {
+          return this;
+        },
+        async maybeSingle() {
+          if (tableName === 'threads') {
+            return {
+              data: { thread_id: insertedThreadId },
+              error: null,
+            };
+          }
+
+          return {
+            data: { value: this.wasUpdated ? 8 : 7 },
+            error: null,
+          };
+        },
+      };
+    },
+  };
+}
+
+test('POST /threads inserts a thread and returns the new thread_id', async () => {
+  const app = createApp({
+    supabaseClient: createInsertThreadRouteClient({ insertedThreadId: 5 }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/threads',
+    body: {
+      title: 'Thread title',
+      summary: 'Thread summary',
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, {
+    success: true,
+    thread_id: 5,
+  });
+});
+
+test('POST /threads returns validation errors for invalid payloads', async () => {
+  const app = createApp({
+    supabaseClient: createInsertThreadRouteClient({ insertedThreadId: 5 }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/threads',
+    body: {
+      title: '',
+      summary: 'Thread summary',
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.body, {
+    error: 'title is required',
+  });
+});
+
 test('GET /threadsList returns threads as an array', async () => {
   const threads = [
     {
