@@ -29,6 +29,5 @@ function getSupabaseClient() {
   });
 
   return supabaseClient;
-}
-
+} 
 module.exports = { getSupabaseClient };

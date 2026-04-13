@@ -7,7 +7,7 @@ const { notFoundHandler } = require('./middleware/notFoundHandler');
 
 function createApp(dependencies = {}) {
   const app = express();
-
+  
   // Allows tests and future modules to inject shared clients without global mocks.
   app.locals.dependencies = dependencies;
 

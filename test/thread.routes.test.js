@@ -2,8 +2,8 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const request = require('supertest');
 const { createApp } = require('../src/app');
+const { invokeApp } = require('../test_utils/invokeApp');
 
 function createThreadsClient({ data, error = null }) {
   return {
@@ -39,8 +39,9 @@ test('GET /threadsList returns threads as an array', async () => {
     supabaseClient: createThreadsClient({ data: threads }),
   });
 
-  const response = await request(app).get('/threadsList').expect(200);
+  const response = await invokeApp(app, { method: 'GET', url: '/threadsList' });
 
+  assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, threads);
 });
 
@@ -80,8 +81,9 @@ test('GET /threads/:id returns one thread with timeline_entries', async () => {
     }),
   });
 
-  const response = await request(app).get('/threads/42').expect(200);
+  const response = await invokeApp(app, { method: 'GET', url: '/threads/42' });
 
+  assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, {
     thread_id: 42,
     title: 'Thread title',
@@ -96,7 +98,8 @@ test('GET /threads/:id returns 404 when thread is missing', async () => {
     supabaseClient: createThreadByIdClient({ thread: null }),
   });
 
-  const response = await request(app).get('/threads/404').expect(404);
+  const response = await invokeApp(app, { method: 'GET', url: '/threads/404' });
 
+  assert.equal(response.statusCode, 404);
   assert.deepEqual(response.body, { error: 'Thread not found' });
 });
