@@ -13,6 +13,7 @@ function createApp(dependencies = {}) {
   app.locals.dependencies = dependencies;
 
   app.use(express.json());
+  app.use(cors());
   app.use(routes);
   app.use(notFoundHandler);
   app.use(errorHandler);
