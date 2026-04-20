@@ -67,7 +67,7 @@ async function loadThreadProgressOrFail({ supabaseClient, threadId }) {
   return data;
 }
 
-async function insertQuote({ supabaseClient, payload, versionService }) {
+async function insertQuote({ supabaseClient, payload }) {
   const quote = validateInsertQuotePayload(payload);
   const thread = await loadThreadProgressOrFail({
     supabaseClient,
@@ -130,8 +130,6 @@ async function insertQuote({ supabaseClient, payload, versionService }) {
   if (threadUpdateError) {
     throw new AppError(502, 'Failed to update thread progress in Supabase', threadUpdateError);
   }
-
-  await versionService.updateVersion({ supabaseClient });
 
   return timelineEntry.entry_id;
 }

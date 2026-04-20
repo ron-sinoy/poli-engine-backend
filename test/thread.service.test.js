@@ -124,7 +124,7 @@ function createInsertThreadClient({ insertedThreadId = 5, insertError = null, up
   };
 }
 
-test('insertThread inserts a thread and then increments version_id', async () => {
+test('insertThread inserts a thread without updating version_id', async () => {
   const supabaseClient = createInsertThreadClient({});
 
   const threadId = await insertThread({
@@ -132,13 +132,6 @@ test('insertThread inserts a thread and then increments version_id', async () =>
     payload: {
       title: 'Thread title',
       summary: 'Thread summary',
-    },
-    versionService: {
-      updateVersion({ supabaseClient: suppliedClient }) {
-        return require('../src/services/version.service').updateVersion({
-          supabaseClient: suppliedClient,
-        });
-      },
     },
   });
 
@@ -151,7 +144,7 @@ test('insertThread inserts a thread and then increments version_id', async () =>
   assert.equal(supabaseClient.calls[1][2].updated_at, null);
   assert.equal(supabaseClient.calls[1][2].current_position, 0);
   assert.equal(typeof supabaseClient.calls[1][2].created_at, 'string');
-  assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'version_log'));
+  assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
 test('insertThread rejects missing title', async () => {
@@ -165,7 +158,6 @@ test('insertThread rejects missing title', async () => {
           title: '',
           summary: 'Thread summary',
         },
-        versionService: { updateVersion() {} },
       }),
     (error) => error instanceof AppError && error.statusCode === 422 && error.message === 'title is required'
   );
@@ -183,32 +175,6 @@ test('insertThread maps Supabase insert failures to AppError', async () => {
         payload: {
           title: 'Thread title',
           summary: 'Thread summary',
-        },
-        versionService: { updateVersion() {} },
-      }),
-    (error) => error instanceof AppError && error.statusCode === 502
-  );
-});
-
-test('insertThread surfaces version update failures after a successful insert', async () => {
-  const supabaseClient = createInsertThreadClient({
-    updateError: { message: 'update failed' },
-  });
-
-  await assert.rejects(
-    () =>
-      insertThread({
-        supabaseClient,
-        payload: {
-          title: 'Thread title',
-          summary: 'Thread summary',
-        },
-        versionService: {
-          updateVersion({ supabaseClient: suppliedClient }) {
-            return require('../src/services/version.service').updateVersion({
-              supabaseClient: suppliedClient,
-            });
-          },
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502
@@ -285,12 +251,26 @@ test('getThreadById assembles incidents and quotes without nested ids', async ()
     quote_persons: [{ entry_id: 102, person_id: 203 }],
     persons: [
       { person_id: 201, name: 'Speaker', photo_url: 'speaker.jpg', politician_id: 301 },
-      { person_id: 202, name: 'Incident person', photo_url: 'incident.jpg', politician_id: null },
+      {
+        person_id: 202,
+        name: 'Incident person',
+        photo_url: 'incident.jpg',
+        politician_id: 302,
+      },
       { person_id: 203, name: 'Quote person', photo_url: 'quote.jpg', politician_id: null },
     ],
-    politicians: [{ politician_id: 301, party_id: 401 }],
-    parties: [{ party_id: 401, alliance_id: 501 }],
-    alliances: [{ alliance_id: 501, color: '#ff0000' }],
+    politicians: [
+      { politician_id: 301, party_id: 401 },
+      { politician_id: 302, party_id: 402 },
+    ],
+    parties: [
+      { party_id: 401, name: 'Communist Party of India (Marxist)', alliance_id: 501 },
+      { party_id: 402, name: 'Indian National Congress', alliance_id: 502 },
+    ],
+    alliances: [
+      { alliance_id: 501, name: 'Left Democratic Front', color: '#ff0000' },
+      { alliance_id: 502, name: 'United Democratic Front', color: '#00ff00' },
+    ],
   });
 
   const result = await getThreadById({ supabaseClient, threadId: '42' });
@@ -309,16 +289,31 @@ test('getThreadById assembles incidents and quotes without nested ids', async ()
         speaker: {
           name: 'Speaker',
           photo_url: 'speaker.jpg',
-          alliance: { color: '#ff0000' },
+          party: { name: 'Communist Party of India (Marxist)' },
+          alliance: { name: 'Left Democratic Front', color: '#ff0000' },
         },
-        persons_involved: [{ name: 'Quote person', photo_url: 'quote.jpg' }],
+        persons_involved: [
+          {
+            name: 'Quote person',
+            photo_url: 'quote.jpg',
+            party: null,
+            alliance: null,
+          },
+        ],
       },
       {
         entry_type: 'incident',
         position: 1,
         published_at: '2026-04-10T09:00:00Z',
         body: 'Incident body',
-        persons_involved: [{ name: 'Incident person', photo_url: 'incident.jpg' }],
+        persons_involved: [
+          {
+            name: 'Incident person',
+            photo_url: 'incident.jpg',
+            party: { name: 'Indian National Congress' },
+            alliance: { name: 'United Democratic Front', color: '#00ff00' },
+          },
+        ],
       },
     ],
   });
@@ -340,6 +335,17 @@ test('getThreadById assembles incidents and quotes without nested ids', async ()
         call[1] === 'timeline_entries' &&
         call[2] === 'position' &&
         call[3].ascending === false
+    )
+  );
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'select' && call[1] === 'parties' && call[2] === 'party_id,name,alliance_id'
+    )
+  );
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) =>
+        call[0] === 'select' && call[1] === 'alliances' && call[2] === 'alliance_id,name,color'
     )
   );
 });

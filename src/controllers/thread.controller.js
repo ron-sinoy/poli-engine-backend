@@ -21,7 +21,6 @@ async function insertThread(request, response) {
   const threadId = await threadService.insertThread({
     supabaseClient: resolveSupabaseClient(request),
     payload: request.body,
-    versionService: require('../services/version.service'),
   });
 
   response.json({

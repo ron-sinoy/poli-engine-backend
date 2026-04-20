@@ -14,12 +14,12 @@
 - [x] update-version
 - [x] load-thread
 - [x] load-threads-list
-- [ ] insert-incidents
-- [ ] insert-quotes
-- [ ] add-party
-- [ ] add-politiicians
-- [ ] Make sure all data from table is reaching frontend, not just required, except securirty risk
-- [ ] make sure to make this follow rest convention
+- [x] insert-incidents
+- [x] insert-quotes
+- [x] add-party
+- [x] add-politiicians
+- [x] Make sure all data from table is reaching frontend, not just required, except securirty risk
+- [x] make sure to make this follow rest convention
 - [ ] if one insertion fails, fail the whole insertions
 
 ### Final touchups

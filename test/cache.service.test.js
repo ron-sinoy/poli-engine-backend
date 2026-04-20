@@ -14,12 +14,34 @@ function createCacheClient(tables) {
       calls.push(['from', tableName]);
 
       return {
-        async select(columns) {
+        select(columns) {
           calls.push(['select', tableName, columns]);
+
+          if (tableName === 'version_log') {
+            return this;
+          }
+
+          const table = tables[tableName];
+
+          return Promise.resolve({
+            data: table?.data ?? [],
+            error: table?.error ?? null,
+          });
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return this;
+        },
+        limit(count) {
+          calls.push(['limit', tableName, count]);
+          return this;
+        },
+        async maybeSingle() {
+          calls.push(['maybeSingle', tableName]);
           const table = tables[tableName];
 
           return {
-            data: table?.data ?? [],
+            data: table?.data ?? null,
             error: table?.error ?? null,
           };
         },
@@ -28,7 +50,7 @@ function createCacheClient(tables) {
   };
 }
 
-test('getCache returns alphabetically sorted persons and parties', async () => {
+test('getCache returns alphabetically sorted persons plus party and alliance names', async () => {
   const supabaseClient = createCacheClient({
     persons: {
       data: [
@@ -45,28 +67,52 @@ test('getCache returns alphabetically sorted persons and parties', async () => {
     },
     parties: {
       data: [
-        { party_id: 101, abbreviation: 'CPM', alliance_id: 201 },
-        { party_id: 100, abbreviation: 'INC', alliance_id: 200 },
+        { party_id: 101, name: 'Communist Party of India (Marxist)', abbreviation: 'CPM', alliance_id: 201 },
+        { party_id: 100, name: 'Indian National Congress', abbreviation: 'INC', alliance_id: 200 },
       ],
     },
     alliances: {
       data: [
-        { alliance_id: 201, abbreviation: 'LDF' },
-        { alliance_id: 200, abbreviation: 'UDF' },
+        { alliance_id: 201, name: 'Left Democratic Front', abbreviation: 'LDF' },
+        { alliance_id: 200, name: 'United Democratic Front', abbreviation: 'UDF' },
       ],
+    },
+    version_log: {
+      data: { value: 7 },
     },
   });
 
   const result = await getCache({ supabaseClient });
 
   assert.deepEqual(result, {
+    version_id: 7,
     persons: [
-      { name: 'A K Antony', party: 'INC' },
-      { name: 'Journalist', party: null },
-      { name: 'VS Achuthanandan', party: 'CPM' },
+      {
+        name: 'A K Antony',
+        party: 'INC',
+        party_name: 'Indian National Congress',
+        alliance: 'UDF',
+        alliance_name: 'United Democratic Front',
+      },
+      {
+        name: 'Journalist',
+        party: null,
+        party_name: null,
+        alliance: null,
+        alliance_name: null,
+      },
+      {
+        name: 'VS Achuthanandan',
+        party: 'CPM',
+        party_name: 'Communist Party of India (Marxist)',
+        alliance: 'LDF',
+        alliance_name: 'Left Democratic Front',
+      },
     ],
     parties: ['CPM', 'INC'],
+    party_names: ['Communist Party of India (Marxist)', 'Indian National Congress'],
     alliances: ['LDF', 'UDF'],
+    alliance_names: ['Left Democratic Front', 'United Democratic Front'],
   });
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'persons'],
@@ -74,9 +120,14 @@ test('getCache returns alphabetically sorted persons and parties', async () => {
     ['from', 'politicians'],
     ['select', 'politicians', 'politician_id,party_id'],
     ['from', 'parties'],
-    ['select', 'parties', 'party_id,abbreviation,alliance_id'],
+    ['select', 'parties', 'party_id,name,abbreviation,alliance_id'],
     ['from', 'alliances'],
-    ['select', 'alliances', 'alliance_id,abbreviation'],
+    ['select', 'alliances', 'alliance_id,name,abbreviation'],
+    ['from', 'version_log'],
+    ['select', 'version_log', 'value'],
+    ['eq', 'version_log', 'key', 'version_id'],
+    ['limit', 'version_log', 1],
+    ['maybeSingle', 'version_log'],
   ]);
 });
 
@@ -93,6 +144,34 @@ test('getCache maps Supabase failures to AppError', async () => {
     },
     alliances: {
       data: [],
+    },
+    version_log: {
+      data: { value: 7 },
+    },
+  });
+
+  await assert.rejects(
+    () => getCache({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('getCache maps version read failures to AppError', async () => {
+  const supabaseClient = createCacheClient({
+    persons: {
+      data: [],
+    },
+    politicians: {
+      data: [],
+    },
+    parties: {
+      data: [],
+    },
+    alliances: {
+      data: [],
+    },
+    version_log: {
+      error: { message: 'version unavailable' },
     },
   });
 

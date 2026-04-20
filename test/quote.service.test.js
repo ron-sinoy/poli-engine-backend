@@ -88,15 +88,7 @@ function createQuoteClient({
   };
 }
 
-function delegatedVersionService() {
-  return {
-    updateVersion({ supabaseClient }) {
-      return require('../src/services/version.service').updateVersion({ supabaseClient });
-    },
-  };
-}
-
-test('insertQuote writes timeline, quote, quote_persons, thread update, then version', async () => {
+test('insertQuote writes timeline, quote, quote_persons, and thread update without version change', async () => {
   const supabaseClient = createQuoteClient({});
 
   const entryId = await insertQuote({
@@ -110,7 +102,6 @@ test('insertQuote writes timeline, quote, quote_persons, thread update, then ver
       published_at: '2026-04-13T10:00:00.000Z',
       position: 3,
     },
-    versionService: delegatedVersionService(),
   });
 
   assert.equal(entryId, 10);
@@ -162,7 +153,7 @@ test('insertQuote writes timeline, quote, quote_persons, thread update, then ver
     ['maybeSingle', 'quote_persons'],
   ]);
   assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'threads'));
-  assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'version_log'));
+  assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
 test('insertQuote rejects invalid persons_involved payloads', async () => {
@@ -181,7 +172,6 @@ test('insertQuote rejects invalid persons_involved payloads', async () => {
           published_at: '2026-04-13T10:00:00.000Z',
           position: 3,
         },
-        versionService: delegatedVersionService(),
       }),
     (error) =>
       error instanceof AppError &&
@@ -208,31 +198,6 @@ test('insertQuote maps quote insert failures to AppError', async () => {
           published_at: '2026-04-13T10:00:00.000Z',
           position: 3,
         },
-        versionService: delegatedVersionService(),
-      }),
-    (error) => error instanceof AppError && error.statusCode === 502
-  );
-});
-
-test('insertQuote surfaces version update failures after successful writes', async () => {
-  const supabaseClient = createQuoteClient({
-    versionUpdateError: { message: 'update failed' },
-  });
-
-  await assert.rejects(
-    () =>
-      insertQuote({
-        supabaseClient,
-        payload: {
-          thread_id: 1,
-          quote_text: 'Quote text',
-          source_url: 'https://example.com/quote',
-          speaker_id: 5,
-          persons_involved: [9],
-          published_at: '2026-04-13T10:00:00.000Z',
-          position: 3,
-        },
-        versionService: delegatedVersionService(),
       }),
     (error) => error instanceof AppError && error.statusCode === 502
   );

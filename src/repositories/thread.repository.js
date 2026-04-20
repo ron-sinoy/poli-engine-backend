@@ -95,11 +95,11 @@ async function loadPoliticiansByIds({ supabaseClient, politicianIds }) {
 }
 
 async function loadPartiesByIds({ supabaseClient, partyIds }) {
-  return supabaseClient.from('parties').select('party_id,alliance_id').in('party_id', partyIds);
+  return supabaseClient.from('parties').select('party_id,name,alliance_id').in('party_id', partyIds);
 }
 
 async function loadAlliancesByIds({ supabaseClient, allianceIds }) {
-  return supabaseClient.from('alliances').select('alliance_id,color').in('alliance_id', allianceIds);
+  return supabaseClient.from('alliances').select('alliance_id,name,color').in('alliance_id', allianceIds);
 }
 
 module.exports = {

@@ -88,15 +88,7 @@ function createIncidentClient({
   };
 }
 
-function delegatedVersionService() {
-  return {
-    updateVersion({ supabaseClient }) {
-      return require('../src/services/version.service').updateVersion({ supabaseClient });
-    },
-  };
-}
-
-test('insertIncident writes timeline, incident, incident_persons, thread update, then version', async () => {
+test('insertIncident writes timeline, incident, incident_persons, and thread update without version change', async () => {
   const supabaseClient = createIncidentClient({});
 
   const entryId = await insertIncident({
@@ -109,7 +101,6 @@ test('insertIncident writes timeline, incident, incident_persons, thread update,
       published_at: '2026-04-13T10:00:00.000Z',
       position: 3,
     },
-    versionService: delegatedVersionService(),
   });
 
   assert.equal(entryId, 11);
@@ -160,7 +151,7 @@ test('insertIncident writes timeline, incident, incident_persons, thread update,
     ['maybeSingle', 'incident_persons'],
   ]);
   assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'threads'));
-  assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'version_log'));
+  assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
 test('insertIncident rejects invalid published_at values', async () => {
@@ -178,7 +169,6 @@ test('insertIncident rejects invalid published_at values', async () => {
           published_at: 'bad',
           position: 3,
         },
-        versionService: delegatedVersionService(),
       }),
     (error) =>
       error instanceof AppError &&
@@ -204,30 +194,6 @@ test('insertIncident maps incident insert failures to AppError', async () => {
           published_at: '2026-04-13T10:00:00.000Z',
           position: 3,
         },
-        versionService: delegatedVersionService(),
-      }),
-    (error) => error instanceof AppError && error.statusCode === 502
-  );
-});
-
-test('insertIncident surfaces version update failures after successful writes', async () => {
-  const supabaseClient = createIncidentClient({
-    versionUpdateError: { message: 'update failed' },
-  });
-
-  await assert.rejects(
-    () =>
-      insertIncident({
-        supabaseClient,
-        payload: {
-          thread_id: 1,
-          body: 'Incident body',
-          source_url: 'https://example.com/incident',
-          persons_involved: [9],
-          published_at: '2026-04-13T10:00:00.000Z',
-          position: 3,
-        },
-        versionService: delegatedVersionService(),
       }),
     (error) => error instanceof AppError && error.statusCode === 502
   );

@@ -40,3 +40,15 @@
 - [P18] Added write endpoints for `POST /threads`, `POST /persons`, `POST /quotes`, and `POST /incidents` using controller-service-repository modules and shared `updateVersion` reuse.
 - [P18] Corrected the public party creation route to `POST /parties` and updated tests to match the current `AGENTS.md` REST plural-noun contract.
 - [P18] Added service and route tests for thread, person, quote, and incident insert flows; verified backend tests pass: 14 passed, 0 failed.
+
+## 2026-04-20
+- [P19] Removed internal `updateVersion` calls from `insertThread`, `insertQuote`, and `insertIncident` while leaving person and party version bumps unchanged.
+- [P19] Updated service tests so thread, quote, and incident flows now assert no `version_log` update occurs.
+- [P19] Verified backend tests pass: 14 passed, 0 failed.
+- [P20] Added `backend_endpoint_db_map.md` documenting each current HTTP endpoint, its DB reads/writes, and columns intentionally not fetched from already-queried tables.
+- [P21] Expanded `GET /threads/:id` person payloads to include fetched party and alliance names, while preserving alliance color where available.
+- [P21] Expanded `GET /cache` to return party/alliance names alongside the existing abbreviation-based fields and updated the endpoint DB map accordingly.
+- [P21] Verified backend tests pass: 14 passed, 0 failed.
+- [P22] Reviewed `AGENT_LOG.md`, `research/architecture_masterplan.pdf`, and `backend_endpoint_db_map.md` to rebuild project context before further backend work.
+- [P23] Added `backend_endpoint_contracts.md` documenting implemented backend endpoints, response shapes, POST user inputs, and server-managed values.
+- [P24] Updated `GET /cache` to include top-level `version_id` from `version_log` and documented the response contract.

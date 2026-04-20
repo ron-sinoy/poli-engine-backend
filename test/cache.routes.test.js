@@ -9,11 +9,29 @@ function createCacheClient(tables) {
   return {
     from(tableName) {
       return {
-        async select() {
+        select() {
+          if (tableName === 'version_log') {
+            return this;
+          }
+
+          const table = tables[tableName];
+
+          return Promise.resolve({
+            data: table?.data ?? [],
+            error: table?.error ?? null,
+          });
+        },
+        eq() {
+          return this;
+        },
+        limit() {
+          return this;
+        },
+        async maybeSingle() {
           const table = tables[tableName];
 
           return {
-            data: table?.data ?? [],
+            data: table?.data ?? null,
             error: table?.error ?? null,
           };
         },
@@ -35,10 +53,20 @@ test('GET /cache returns persons with party names and party name list', async ()
         data: [{ politician_id: 11, party_id: 20 }],
       },
       parties: {
-        data: [{ party_id: 20, abbreviation: 'CPM', alliance_id: 30 }],
+        data: [
+          {
+            party_id: 20,
+            name: 'Communist Party of India (Marxist)',
+            abbreviation: 'CPM',
+            alliance_id: 30,
+          },
+        ],
       },
       alliances: {
-        data: [{ alliance_id: 30, abbreviation: 'LDF' }],
+        data: [{ alliance_id: 30, name: 'Left Democratic Front', abbreviation: 'LDF' }],
+      },
+      version_log: {
+        data: { value: 7 },
       },
     }),
   });
@@ -47,11 +75,26 @@ test('GET /cache returns persons with party names and party name list', async ()
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, {
+    version_id: 7,
     persons: [
-      { name: 'Analyst', party: null },
-      { name: 'Pinarayi Vijayan', party: 'CPM' },
+      {
+        name: 'Analyst',
+        party: null,
+        party_name: null,
+        alliance: null,
+        alliance_name: null,
+      },
+      {
+        name: 'Pinarayi Vijayan',
+        party: 'CPM',
+        party_name: 'Communist Party of India (Marxist)',
+        alliance: 'LDF',
+        alliance_name: 'Left Democratic Front',
+      },
     ],
     parties: ['CPM'],
+    party_names: ['Communist Party of India (Marxist)'],
     alliances: ['LDF'],
+    alliance_names: ['Left Democratic Front'],
   });
 });

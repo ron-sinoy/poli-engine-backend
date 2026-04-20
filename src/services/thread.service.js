@@ -21,14 +21,29 @@ function groupBy(rows, key) {
   }, new Map());
 }
 
-function publicPerson(person) {
+function publicPerson({ person, politiciansById, partiesById, alliancesById }) {
   if (!person) {
     return null;
   }
 
+  const politician = politiciansById.get(person.politician_id);
+  const party = partiesById.get(politician?.party_id);
+  const alliance = alliancesById.get(party?.alliance_id);
+
   return {
     name: person.name,
     photo_url: person.photo_url,
+    party: party
+      ? {
+          name: party.name,
+        }
+      : null,
+    alliance: alliance
+      ? {
+          name: alliance.name,
+          color: alliance.color ?? null,
+        }
+      : null,
   };
 }
 
@@ -60,7 +75,7 @@ async function loadThreadsList({ supabaseClient }) {
   return data || [];
 }
 
-async function insertThread({ supabaseClient, payload, versionService }) {
+async function insertThread({ supabaseClient, payload }) {
   const title = requireNonEmptyString(payload?.title, 'title');
   const summary = requireNonEmptyString(payload?.summary, 'summary');
   const timestamp = new Date().toISOString();
@@ -82,8 +97,6 @@ async function insertThread({ supabaseClient, payload, versionService }) {
   if (!data) {
     throw new AppError(502, 'Failed to insert thread into Supabase');
   }
-
-  await versionService.updateVersion({ supabaseClient });
 
   return data.thread_id;
 }
@@ -201,32 +214,39 @@ async function getThreadById({ supabaseClient, threadId }) {
         ...baseEntry,
         body: incidentsByEntryId.get(entry.entry_id)?.body ?? null,
         persons_involved: (incidentPersonsByEntryId.get(entry.entry_id) || [])
-          .map((row) => publicPerson(personsById.get(row.person_id)))
+          .map((row) =>
+            publicPerson({
+              person: personsById.get(row.person_id),
+              politiciansById,
+              partiesById,
+              alliancesById,
+            })
+          )
           .filter(Boolean),
       };
     }
 
     if (entry.entry_type === 'quote') {
       const quote = quotesByEntryId.get(entry.entry_id);
-      const speaker = personsById.get(quote?.speaker_id);
-      const politician = politiciansById.get(speaker?.politician_id);
-      const party = partiesById.get(politician?.party_id);
-      const alliance = alliancesById.get(party?.alliance_id);
 
       return {
         ...baseEntry,
         quote_text: quote?.quote_text ?? null,
-        speaker: speaker
-          ? {
-              name: speaker.name,
-              photo_url: speaker.photo_url,
-              alliance: {
-                color: alliance?.color ?? null,
-              },
-            }
-          : null,
+        speaker: publicPerson({
+          person: personsById.get(quote?.speaker_id),
+          politiciansById,
+          partiesById,
+          alliancesById,
+        }),
         persons_involved: (quotePersonsByEntryId.get(entry.entry_id) || [])
-          .map((row) => publicPerson(personsById.get(row.person_id)))
+          .map((row) =>
+            publicPerson({
+              person: personsById.get(row.person_id),
+              politiciansById,
+              partiesById,
+              alliancesById,
+            })
+          )
           .filter(Boolean),
       };
     }

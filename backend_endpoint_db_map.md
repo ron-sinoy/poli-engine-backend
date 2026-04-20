@@ -1,0 +1,229 @@
+# Backend HTTP Endpoint DB Map
+
+This file reflects the current backend implementation in `src/`.
+
+## Global Notes
+
+- `GET /health` does not touch the database.
+- Current code bumps `version_log` only in:
+  - `POST /persons`
+  - `POST /parties`
+  - `POST /version/update`
+- Current code does **not** bump `version_log` in:
+  - `POST /threads`
+  - `POST /quotes`
+  - `POST /incidents`
+
+## GET /health
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - None
+
+## GET /cache
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `persons`: `person_id`, `name`, `politician_id`
+  - `politicians`: `politician_id`, `party_id`
+  - `parties`: `party_id`, `name`, `abbreviation`, `alliance_id`
+  - `alliances`: `alliance_id`, `name`, `abbreviation`
+  - `version_log`: `value` where `key = 'version_id'`
+- Not fetched from tables already queried:
+  - `persons`: `photo_url`
+  - `parties`: `logo_url`
+  - `alliances`: `color`
+  - `version_log`: `key`
+- Response shaping notes:
+  - Returns `version_id`, `persons[].name`, `persons[].party`, `persons[].party_name`, `persons[].alliance`, `persons[].alliance_name`, `parties[]`, `party_names[]`, `alliances[]`, and `alliance_names[]`
+  - Helper ids fetched for joins are not returned
+
+## POST /threads
+
+- Inserts/updates:
+  - `threads` insert:
+    - `title`
+    - `summary`
+    - `created_at`
+    - `updated_at = null`
+    - `current_position = 0`
+- Fetches:
+  - Insert return from `threads`: `thread_id`
+- Not fetched/read back from table already written:
+  - `threads`: `title`, `summary`, `created_at`, `updated_at`, `current_position`
+- Response shaping notes:
+  - Returns `{ success: true, thread_id }`
+
+## GET /threadsList
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `threads`: `thread_id`, `title`, `summary`, `updated_at`
+- Not fetched from table already queried:
+  - `threads`: `created_at`, `current_position`
+
+## GET /threads/:id
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `threads`: `thread_id`, `title`, `summary`, `updated_at`
+  - `timeline_entries`: `entry_id`, `entry_type`, `position`, `published_at`
+  - `incidents`: `entry_id`, `body`
+  - `quotes`: `entry_id`, `quote_text`, `speaker_id`
+  - `incident_persons`: `entry_id`, `person_id`
+  - `quote_persons`: `entry_id`, `person_id`
+  - `persons`: `person_id`, `name`, `photo_url`, `politician_id`
+  - `politicians`: `politician_id`, `party_id`
+  - `parties`: `party_id`, `name`, `alliance_id`
+  - `alliances`: `alliance_id`, `name`, `color`
+- Not fetched from tables already queried:
+  - `threads`: `created_at`, `current_position`
+  - `timeline_entries`: `thread_id`
+  - `incidents`: `source_url`
+  - `quotes`: `source_url`
+  - `parties`: `logo_url`, `abbreviation`
+  - `alliances`: `abbreviation`
+- Response shaping notes:
+  - `entry_id` is used internally for joins but is not returned
+  - `source_url` is not fetched, so it never appears in the response
+  - All returned person objects expose:
+    - `name`
+    - `photo_url`
+    - `party.name`
+    - `alliance.name`
+    - `alliance.color`
+  - Helper ids such as `speaker_id`, `politician_id`, `party_id`, and `alliance_id` are not returned
+
+## POST /persons
+
+- Inserts/updates:
+  - If `isPolitician = true`:
+    - `politicians` insert: `party_id`
+  - Always:
+    - `persons` insert: `name`, `photo_url`, `politician_id`
+  - `version_log` read current `value`, then update `value`
+- Fetches:
+  - Insert return from `politicians`: `politician_id`
+  - Insert return from `persons`: `person_id`
+  - `version_log`: `value`
+  - Updated `version_log` return: `value`
+- Not fetched/read back from tables already touched:
+  - `politicians`: `party_id` is inserted but not read back
+  - `persons`: `name`, `photo_url`, `politician_id` are inserted but not read back
+  - `version_log`: `key` is never selected
+- Additional notes:
+  - No read is performed against `parties`; `party_id` is accepted from the request and inserted directly
+
+## POST /quotes
+
+- Inserts/updates:
+  - `timeline_entries` insert:
+    - `thread_id`
+    - `entry_type = 'quote'`
+    - `position`
+    - `published_at`
+  - `quotes` insert:
+    - `entry_id`
+    - `quote_text`
+    - `source_url`
+    - `speaker_id`
+  - `quote_persons` insert:
+    - one row per `persons_involved` item with `entry_id`, `person_id`
+  - `threads` update:
+    - `updated_at`
+    - `current_position`
+- Fetches:
+  - `threads`: `thread_id`, `current_position`
+  - Insert return from `timeline_entries`: `entry_id`
+  - Insert return from `quotes`: `entry_id`
+  - Insert return from `quote_persons`: `entry_id`
+  - Updated `threads` return: `thread_id`, `current_position`
+- Not fetched from tables already touched:
+  - `threads` pre-read omits: `title`, `summary`, `created_at`, `updated_at`
+  - `threads` update return omits: `updated_at`
+  - `timeline_entries` insert return omits: `thread_id`, `entry_type`, `position`, `published_at`
+  - `quotes` insert return omits: `quote_text`, `source_url`, `speaker_id`
+  - `quote_persons` insert return omits: `person_id`
+- Additional notes:
+  - No read is performed against `persons` or `threads` detail tables to validate `speaker_id` or `persons_involved`
+  - Returns `{ success: true, entry_id }`
+
+## POST /incidents
+
+- Inserts/updates:
+  - `timeline_entries` insert:
+    - `thread_id`
+    - `entry_type = 'incident'`
+    - `position`
+    - `published_at`
+  - `incidents` insert:
+    - `entry_id`
+    - `body`
+    - `source_url`
+  - `incident_persons` insert:
+    - one row per `persons_involved` item with `entry_id`, `person_id`
+  - `threads` update:
+    - `updated_at`
+    - `current_position`
+- Fetches:
+  - `threads`: `thread_id`, `current_position`
+  - Insert return from `timeline_entries`: `entry_id`
+  - Insert return from `incidents`: `entry_id`
+  - Insert return from `incident_persons`: `entry_id`
+  - Updated `threads` return: `thread_id`, `current_position`
+- Not fetched from tables already touched:
+  - `threads` pre-read omits: `title`, `summary`, `created_at`, `updated_at`
+  - `threads` update return omits: `updated_at`
+  - `timeline_entries` insert return omits: `thread_id`, `entry_type`, `position`, `published_at`
+  - `incidents` insert return omits: `body`, `source_url`
+  - `incident_persons` insert return omits: `person_id`
+- Additional notes:
+  - No read is performed against `persons` to validate `persons_involved`
+  - Returns `{ success: true, entry_id }`
+
+## POST /parties
+
+- Inserts/updates:
+  - `parties` insert:
+    - `name`
+    - `logo_url`
+    - `alliance_id`
+    - `abbreviation`
+  - `version_log` read current `value`, then update `value`
+- Fetches:
+  - Insert return from `parties`: `party_id`
+  - `version_log`: `value`
+  - Updated `version_log` return: `value`
+- Not fetched/read back from tables already touched:
+  - `parties`: `name`, `logo_url`, `alliance_id`, `abbreviation` are inserted but not read back
+  - `version_log`: `key` is never selected
+- Additional notes:
+  - No read is performed against `alliances`; `alliance_id` is accepted from the request and inserted directly
+
+## GET /version
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `version_log`: `value` where `key = 'version_id'`
+- Not fetched from table already queried:
+  - `version_log`: `key`
+- Response shaping notes:
+  - Returns `{ version_id }`
+
+## POST /version/update
+
+- Inserts/updates:
+  - `version_log` update:
+    - `value`
+- Fetches:
+  - `version_log`: `value` where `key = 'version_id'`
+  - Updated `version_log` return: `value`
+- Not fetched from table already queried:
+  - `version_log`: `key`
+- Response shaping notes:
+  - Returns `{ version_id }`
