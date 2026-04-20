@@ -52,3 +52,4 @@
 - [P22] Reviewed `AGENT_LOG.md`, `research/architecture_masterplan.pdf`, and `backend_endpoint_db_map.md` to rebuild project context before further backend work.
 - [P23] Added `backend_endpoint_contracts.md` documenting implemented backend endpoints, response shapes, POST user inputs, and server-managed values.
 - [P24] Updated `GET /cache` to include top-level `version_id` from `version_log` and documented the response contract.
+- [P25] Checked backend deploy readiness: verified package scripts, required environment variables, clean worktree, and passing test suite.
