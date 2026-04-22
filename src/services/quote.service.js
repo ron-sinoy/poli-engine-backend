@@ -22,14 +22,6 @@ function requireInteger(value, fieldName) {
   return parsedValue;
 }
 
-function requireIsoTimestamp(value, fieldName) {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-    throw new AppError(422, `${fieldName} must be a valid ISO timestamp`);
-  }
-
-  return value;
-}
-
 function requireIntegerArray(values, fieldName) {
   if (!Array.isArray(values)) {
     throw new AppError(422, `${fieldName} must be an array`);
@@ -45,8 +37,6 @@ function validateInsertQuotePayload(payload = {}) {
     source_url: requireNonEmptyString(payload.source_url, 'source_url'),
     speaker_id: requireInteger(payload.speaker_id, 'speaker_id'),
     persons_involved: requireIntegerArray(payload.persons_involved, 'persons_involved'),
-    published_at: requireIsoTimestamp(payload.published_at, 'published_at'),
-    position: requireInteger(payload.position, 'position'),
   };
 }
 
@@ -73,13 +63,15 @@ async function insertQuote({ supabaseClient, payload }) {
     supabaseClient,
     threadId: quote.thread_id,
   });
+  const entryPosition = Number(thread.current_position);
+  const timestamp = new Date().toISOString();
   const { data: timelineEntry, error: timelineError } = await quoteRepository.insertTimelineEntry({
     supabaseClient,
     timelineEntry: {
       thread_id: quote.thread_id,
       entry_type: 'quote',
-      position: quote.position,
-      published_at: quote.published_at,
+      position: entryPosition,
+      published_at: timestamp,
     },
   });
 
@@ -119,12 +111,11 @@ async function insertQuote({ supabaseClient, payload }) {
     }
   }
 
-  const updatedAt = new Date().toISOString();
   const { error: threadUpdateError } = await threadRepository.updateThreadProgress({
     supabaseClient,
     threadId: quote.thread_id,
-    updatedAt,
-    currentPosition: Number(thread.current_position) + 1,
+    updatedAt: timestamp,
+    currentPosition: entryPosition + 1,
   });
 
   if (threadUpdateError) {

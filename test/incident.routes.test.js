@@ -65,8 +65,6 @@ test('POST /incidents inserts an incident and returns the new entry_id', async (
       body: 'Incident body',
       source_url: 'https://example.com/incident',
       persons_involved: [9],
-      published_at: '2026-04-13T10:00:00.000Z',
-      position: 3,
     },
   });
 
@@ -89,14 +87,12 @@ test('POST /incidents returns validation errors for invalid payloads', async () 
       thread_id: 1,
       body: 'Incident body',
       source_url: 'https://example.com/incident',
-      persons_involved: [9],
-      published_at: 'bad',
-      position: 3,
+      persons_involved: 'bad',
     },
   });
 
   assert.equal(response.statusCode, 422);
   assert.deepEqual(response.body, {
-    error: 'published_at must be a valid ISO timestamp',
+    error: 'persons_involved must be an array',
   });
 });

@@ -14,7 +14,7 @@ async function insertQuote({ supabaseClient, quote }) {
 }
 
 async function insertQuotePersons({ supabaseClient, rows }) {
-  return supabaseClient.from('quote_persons').insert(rows).select('entry_id').limit(1).maybeSingle();
+  return supabaseClient.from('quote_persons').insert(rows).select('entry_id');
 }
 
 module.exports = {

@@ -66,8 +66,6 @@ test('POST /quotes inserts a quote and returns the new entry_id', async () => {
       source_url: 'https://example.com/quote',
       speaker_id: 5,
       persons_involved: [9],
-      published_at: '2026-04-13T10:00:00.000Z',
-      position: 3,
     },
   });
 
@@ -92,8 +90,6 @@ test('POST /quotes returns validation errors for invalid payloads', async () => 
       source_url: 'https://example.com/quote',
       speaker_id: 5,
       persons_involved: 'bad',
-      published_at: '2026-04-13T10:00:00.000Z',
-      position: 3,
     },
   });
 

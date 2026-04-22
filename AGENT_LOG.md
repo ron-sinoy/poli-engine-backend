@@ -53,3 +53,9 @@
 - [P23] Added `backend_endpoint_contracts.md` documenting implemented backend endpoints, response shapes, POST user inputs, and server-managed values.
 - [P24] Updated `GET /cache` to include top-level `version_id` from `version_log` and documented the response contract.
 - [P25] Checked backend deploy readiness: verified package scripts, required environment variables, clean worktree, and passing test suite.
+- [P26] Reviewed the current party route and tests, then provided the correct `curl` example for creating a party and noted that no party update endpoint exists yet.
+- [P27] Added `write_endpoint_flows.md` in the same concise flow style as `sample.md`, covering the current write endpoints with implementation-accurate steps.
+- [P28] Extended `write_endpoint_flows.md` with the current GET endpoints using the same compact flow format and implementation-accurate DB read sequence.
+- [P29] Reviewed `write_endpoint_flows.md` against the current routes, services, and repositories to identify remaining accuracy and formatting issues.
+- [P30] Updated `POST /quotes` and `POST /incidents` so timeline entry position now comes from `threads.current_position`, removed `position` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.
+- [P31] Updated `POST /quotes` and `POST /incidents` so `published_at` is server-generated and reused for `threads.updated_at`, removed `published_at` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.

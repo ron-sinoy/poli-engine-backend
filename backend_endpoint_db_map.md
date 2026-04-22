@@ -124,8 +124,8 @@ This file reflects the current backend implementation in `src/`.
   - `timeline_entries` insert:
     - `thread_id`
     - `entry_type = 'quote'`
-    - `position`
-    - `published_at`
+    - `position` from current `threads.current_position`
+    - `published_at` from server timestamp
   - `quotes` insert:
     - `entry_id`
     - `quote_text`
@@ -149,6 +149,8 @@ This file reflects the current backend implementation in `src/`.
   - `quotes` insert return omits: `quote_text`, `source_url`, `speaker_id`
   - `quote_persons` insert return omits: `person_id`
 - Additional notes:
+  - `position` is server-managed from the thread and is not accepted from the request
+  - `published_at` is server-managed and matches the `threads.updated_at` value written in the same request
   - No read is performed against `persons` or `threads` detail tables to validate `speaker_id` or `persons_involved`
   - Returns `{ success: true, entry_id }`
 
@@ -158,8 +160,8 @@ This file reflects the current backend implementation in `src/`.
   - `timeline_entries` insert:
     - `thread_id`
     - `entry_type = 'incident'`
-    - `position`
-    - `published_at`
+    - `position` from current `threads.current_position`
+    - `published_at` from server timestamp
   - `incidents` insert:
     - `entry_id`
     - `body`
@@ -182,6 +184,8 @@ This file reflects the current backend implementation in `src/`.
   - `incidents` insert return omits: `body`, `source_url`
   - `incident_persons` insert return omits: `person_id`
 - Additional notes:
+  - `position` is server-managed from the thread and is not accepted from the request
+  - `published_at` is server-managed and matches the `threads.updated_at` value written in the same request
   - No read is performed against `persons` to validate `persons_involved`
   - Returns `{ success: true, entry_id }`
 

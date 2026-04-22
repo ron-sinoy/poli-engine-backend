@@ -22,14 +22,6 @@ function requireInteger(value, fieldName) {
   return parsedValue;
 }
 
-function requireIsoTimestamp(value, fieldName) {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-    throw new AppError(422, `${fieldName} must be a valid ISO timestamp`);
-  }
-
-  return value;
-}
-
 function requireIntegerArray(values, fieldName) {
   if (!Array.isArray(values)) {
     throw new AppError(422, `${fieldName} must be an array`);
@@ -44,8 +36,6 @@ function validateInsertIncidentPayload(payload = {}) {
     body: requireNonEmptyString(payload.body, 'body'),
     source_url: requireNonEmptyString(payload.source_url, 'source_url'),
     persons_involved: requireIntegerArray(payload.persons_involved, 'persons_involved'),
-    published_at: requireIsoTimestamp(payload.published_at, 'published_at'),
-    position: requireInteger(payload.position, 'position'),
   };
 }
 
@@ -72,13 +62,15 @@ async function insertIncident({ supabaseClient, payload }) {
     supabaseClient,
     threadId: incident.thread_id,
   });
+  const entryPosition = Number(thread.current_position);
+  const timestamp = new Date().toISOString();
   const { data: timelineEntry, error: timelineError } = await incidentRepository.insertTimelineEntry({
     supabaseClient,
     timelineEntry: {
       thread_id: incident.thread_id,
       entry_type: 'incident',
-      position: incident.position,
-      published_at: incident.published_at,
+      position: entryPosition,
+      published_at: timestamp,
     },
   });
 
@@ -121,12 +113,11 @@ async function insertIncident({ supabaseClient, payload }) {
     }
   }
 
-  const updatedAt = new Date().toISOString();
   const { error: threadUpdateError } = await threadRepository.updateThreadProgress({
     supabaseClient,
     threadId: incident.thread_id,
-    updatedAt,
-    currentPosition: Number(thread.current_position) + 1,
+    updatedAt: timestamp,
+    currentPosition: entryPosition + 1,
   });
 
   if (threadUpdateError) {

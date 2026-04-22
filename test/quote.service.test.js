@@ -99,8 +99,6 @@ test('insertQuote writes timeline, quote, quote_persons, and thread update witho
       source_url: 'https://example.com/quote',
       speaker_id: 5,
       persons_involved: [9, 10],
-      published_at: '2026-04-13T10:00:00.000Z',
-      position: 3,
     },
   });
 
@@ -118,8 +116,8 @@ test('insertQuote writes timeline, quote, quote_persons, and thread update witho
       {
         thread_id: 1,
         entry_type: 'quote',
-        position: 3,
-        published_at: '2026-04-13T10:00:00.000Z',
+        position: 2,
+        published_at: supabaseClient.calls[6][2].published_at,
       },
     ],
     ['select', 'timeline_entries', 'entry_id'],
@@ -153,6 +151,18 @@ test('insertQuote writes timeline, quote, quote_persons, and thread update witho
     ['maybeSingle', 'quote_persons'],
   ]);
   assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'threads'));
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'update' && call[1] === 'threads' && call[2].current_position === 3
+    )
+  );
+  const timelineInsert = supabaseClient.calls.find(
+    (call) => call[0] === 'insert' && call[1] === 'timeline_entries'
+  );
+  const threadUpdate = supabaseClient.calls.find(
+    (call) => call[0] === 'update' && call[1] === 'threads'
+  );
+  assert.equal(timelineInsert[2].published_at, threadUpdate[2].updated_at);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
@@ -169,8 +179,6 @@ test('insertQuote rejects invalid persons_involved payloads', async () => {
           source_url: 'https://example.com/quote',
           speaker_id: 5,
           persons_involved: 'bad',
-          published_at: '2026-04-13T10:00:00.000Z',
-          position: 3,
         },
       }),
     (error) =>
@@ -195,8 +203,6 @@ test('insertQuote maps quote insert failures to AppError', async () => {
           source_url: 'https://example.com/quote',
           speaker_id: 5,
           persons_involved: [9],
-          published_at: '2026-04-13T10:00:00.000Z',
-          position: 3,
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502

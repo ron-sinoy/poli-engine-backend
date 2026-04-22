@@ -22,9 +22,7 @@ async function insertIncidentPersons({ supabaseClient, rows }) {
   return supabaseClient
     .from('incident_persons')
     .insert(rows)
-    .select('entry_id')
-    .limit(1)
-    .maybeSingle();
+    .select('entry_id');
 }
 
 module.exports = {

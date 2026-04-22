@@ -98,8 +98,6 @@ test('insertIncident writes timeline, incident, incident_persons, and thread upd
       body: 'Incident body',
       source_url: 'https://example.com/incident',
       persons_involved: [9, 10],
-      published_at: '2026-04-13T10:00:00.000Z',
-      position: 3,
     },
   });
 
@@ -117,8 +115,8 @@ test('insertIncident writes timeline, incident, incident_persons, and thread upd
       {
         thread_id: 1,
         entry_type: 'incident',
-        position: 3,
-        published_at: '2026-04-13T10:00:00.000Z',
+        position: 2,
+        published_at: supabaseClient.calls[6][2].published_at,
       },
     ],
     ['select', 'timeline_entries', 'entry_id'],
@@ -151,10 +149,22 @@ test('insertIncident writes timeline, incident, incident_persons, and thread upd
     ['maybeSingle', 'incident_persons'],
   ]);
   assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'threads'));
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'update' && call[1] === 'threads' && call[2].current_position === 3
+    )
+  );
+  const timelineInsert = supabaseClient.calls.find(
+    (call) => call[0] === 'insert' && call[1] === 'timeline_entries'
+  );
+  const threadUpdate = supabaseClient.calls.find(
+    (call) => call[0] === 'update' && call[1] === 'threads'
+  );
+  assert.equal(timelineInsert[2].published_at, threadUpdate[2].updated_at);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
-test('insertIncident rejects invalid published_at values', async () => {
+test('insertIncident rejects invalid persons_involved payloads', async () => {
   const supabaseClient = createIncidentClient({});
 
   await assert.rejects(
@@ -165,15 +175,13 @@ test('insertIncident rejects invalid published_at values', async () => {
           thread_id: 1,
           body: 'Incident body',
           source_url: 'https://example.com/incident',
-          persons_involved: [9],
-          published_at: 'bad',
-          position: 3,
+          persons_involved: 'bad',
         },
       }),
     (error) =>
       error instanceof AppError &&
       error.statusCode === 422 &&
-      error.message === 'published_at must be a valid ISO timestamp'
+      error.message === 'persons_involved must be an array'
   );
 });
 
@@ -191,8 +199,6 @@ test('insertIncident maps incident insert failures to AppError', async () => {
           body: 'Incident body',
           source_url: 'https://example.com/incident',
           persons_involved: [9],
-          published_at: '2026-04-13T10:00:00.000Z',
-          position: 3,
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502
