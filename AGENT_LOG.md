@@ -59,3 +59,4 @@
 - [P29] Reviewed `write_endpoint_flows.md` against the current routes, services, and repositories to identify remaining accuracy and formatting issues.
 - [P30] Updated `POST /quotes` and `POST /incidents` so timeline entry position now comes from `threads.current_position`, removed `position` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.
 - [P31] Updated `POST /quotes` and `POST /incidents` so `published_at` is server-generated and reused for `threads.updated_at`, removed `published_at` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.
+- [P32] Hid the frontend Spotlight placeholder with a CSS `hidden` class in `../frontend/src/components/HomeContainer.jsx` while keeping the JSX in place, per the latest UI instruction.

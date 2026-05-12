@@ -1,6 +1,6 @@
-- [ ] Cleanse current backend one by one
-- [ ] Cleanse current frontend
-- [ ]  Each threads/:1 not going to different page
+- [x] Cleanse current backend one by one
+- [x] Cleanse current frontend
+- [x]  Each threads/:1 not going to different page
 - [ ] Preload
 - [ ] if one insertion fails, fail the whole insertions
 - [ ] Authentication
