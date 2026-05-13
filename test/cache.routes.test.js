@@ -40,7 +40,7 @@ function createCacheClient(tables) {
   };
 }
 
-test('GET /cache returns persons with party names and party name list', async () => {
+test('GET /cache returns persons with structured party and alliance lists', async () => {
   const app = createApp({
     supabaseClient: createCacheClient({
       persons: {
@@ -78,23 +78,40 @@ test('GET /cache returns persons with party names and party name list', async ()
     version_id: 7,
     persons: [
       {
+        person_id: 1,
         name: 'Analyst',
+        party_id: null,
         party: null,
         party_name: null,
+        alliance_id: null,
         alliance: null,
         alliance_name: null,
       },
       {
+        person_id: 2,
         name: 'Pinarayi Vijayan',
+        party_id: 20,
         party: 'CPM',
         party_name: 'Communist Party of India (Marxist)',
+        alliance_id: 30,
         alliance: 'LDF',
         alliance_name: 'Left Democratic Front',
       },
     ],
-    parties: ['CPM'],
-    party_names: ['Communist Party of India (Marxist)'],
-    alliances: ['LDF'],
-    alliance_names: ['Left Democratic Front'],
+    parties: [
+      {
+        party_id: 20,
+        alliance_id: 30,
+        name: 'Communist Party of India (Marxist)',
+        abbreviation: 'CPM',
+      },
+    ],
+    alliances: [
+      {
+        alliance_id: 30,
+        name: 'Left Democratic Front',
+        abbreviation: 'LDF',
+      },
+    ],
   });
 });

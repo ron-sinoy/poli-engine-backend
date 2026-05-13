@@ -37,8 +37,7 @@ This file reflects the current backend implementation in `src/`.
   - `alliances`: `color`
   - `version_log`: `key`
 - Response shaping notes:
-  - Returns `version_id`, `persons[].name`, `persons[].party`, `persons[].party_name`, `persons[].alliance`, `persons[].alliance_name`, `parties[]`, `party_names[]`, `alliances[]`, and `alliance_names[]`
-  - Helper ids fetched for joins are not returned
+  - Returns `version_id`, `persons[].person_id`, `persons[].name`, `persons[].party_id`, `persons[].party`, `persons[].party_name`, `persons[].alliance_id`, `persons[].alliance`, `persons[].alliance_name`, `parties[].party_id`, `parties[].alliance_id`, `parties[].name`, `parties[].abbreviation`, `alliances[].alliance_id`, `alliances[].name`, and `alliances[].abbreviation`
 
 ## POST /threads
 

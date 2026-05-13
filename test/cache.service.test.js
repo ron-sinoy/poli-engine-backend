@@ -50,7 +50,7 @@ function createCacheClient(tables) {
   };
 }
 
-test('getCache returns alphabetically sorted persons plus party and alliance names', async () => {
+test('getCache returns sorted persons plus structured party and alliance lists', async () => {
   const supabaseClient = createCacheClient({
     persons: {
       data: [
@@ -88,31 +88,62 @@ test('getCache returns alphabetically sorted persons plus party and alliance nam
     version_id: 7,
     persons: [
       {
+        person_id: 2,
         name: 'A K Antony',
+        party_id: 100,
         party: 'INC',
         party_name: 'Indian National Congress',
+        alliance_id: 200,
         alliance: 'UDF',
         alliance_name: 'United Democratic Front',
       },
       {
+        person_id: 1,
         name: 'Journalist',
+        party_id: null,
         party: null,
         party_name: null,
+        alliance_id: null,
         alliance: null,
         alliance_name: null,
       },
       {
+        person_id: 3,
         name: 'VS Achuthanandan',
+        party_id: 101,
         party: 'CPM',
         party_name: 'Communist Party of India (Marxist)',
+        alliance_id: 201,
         alliance: 'LDF',
         alliance_name: 'Left Democratic Front',
       },
     ],
-    parties: ['CPM', 'INC'],
-    party_names: ['Communist Party of India (Marxist)', 'Indian National Congress'],
-    alliances: ['LDF', 'UDF'],
-    alliance_names: ['Left Democratic Front', 'United Democratic Front'],
+    parties: [
+      {
+        party_id: 101,
+        alliance_id: 201,
+        name: 'Communist Party of India (Marxist)',
+        abbreviation: 'CPM',
+      },
+      {
+        party_id: 100,
+        alliance_id: 200,
+        name: 'Indian National Congress',
+        abbreviation: 'INC',
+      },
+    ],
+    alliances: [
+      {
+        alliance_id: 201,
+        name: 'Left Democratic Front',
+        abbreviation: 'LDF',
+      },
+      {
+        alliance_id: 200,
+        name: 'United Democratic Front',
+        abbreviation: 'UDF',
+      },
+    ],
   });
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'persons'],

@@ -60,3 +60,12 @@
 - [P30] Updated `POST /quotes` and `POST /incidents` so timeline entry position now comes from `threads.current_position`, removed `position` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.
 - [P31] Updated `POST /quotes` and `POST /incidents` so `published_at` is server-generated and reused for `threads.updated_at`, removed `published_at` from request/test contracts, refreshed endpoint docs, and verified the backend test suite passes: 14 passed, 0 failed.
 - [P32] Hid the frontend Spotlight placeholder with a CSS `hidden` class in `../frontend/src/components/HomeContainer.jsx` while keeping the JSX in place, per the latest UI instruction.
+
+## 2026-05-13
+- [P33] Added `POST /sourceids` with controller-service-repository wiring to insert `source_id` into `pipeline_metadata` and return `{ success: true }` without updating `version_log`.
+- [P33] Added sourceid route and service tests covering success, validation, and insert failure paths.
+- [P33] Updated stale quote/incident service test expectations to match the current non-returning person-link insert behavior and verified backend tests pass: 17 passed, 0 failed.
+- [P34] Added `GET /sourceids` to read `source_id` rows from `pipeline_metadata`, return them as an array, and covered the read path with route/service tests.
+- [P34] Verified backend tests pass after the new read endpoint: 17 passed, 0 failed.
+- [P35] Extended `GET /cache` person rows to include corresponding `person_id`, `party_id`, and `alliance_id`, updated endpoint docs, and verified backend tests pass: 17 passed, 0 failed.
+- [P36] Reworked `GET /cache` top-level `parties` and `alliances` from split name/abbreviation arrays into structured object arrays, updated docs, and verified backend tests pass: 17 passed, 0 failed.

@@ -103,7 +103,7 @@ test('insertQuote writes timeline, quote, quote_persons, and thread update witho
   });
 
   assert.equal(entryId, 10);
-  assert.deepEqual(supabaseClient.calls.slice(0, 20), [
+  assert.deepEqual(supabaseClient.calls.slice(0, 18), [
     ['from', 'threads'],
     ['select', 'threads', 'thread_id,current_position'],
     ['eq', 'threads', 'thread_id', 1],
@@ -147,8 +147,6 @@ test('insertQuote writes timeline, quote, quote_persons, and thread update witho
       ],
     ],
     ['select', 'quote_persons', 'entry_id'],
-    ['limit', 'quote_persons', 1],
-    ['maybeSingle', 'quote_persons'],
   ]);
   assert.ok(supabaseClient.calls.some((call) => call[0] === 'update' && call[1] === 'threads'));
   assert.ok(

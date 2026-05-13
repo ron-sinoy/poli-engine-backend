@@ -8,10 +8,6 @@ function compareAlphabetically(left, right) {
   return String(left).localeCompare(String(right), undefined, { sensitivity: 'base' });
 }
 
-function unique(values) {
-  return [...new Set(values.filter((value) => value !== null && value !== undefined))];
-}
-
 function indexBy(rows, key) {
   return new Map(rows.map((row) => [row[key], row]));
 }
@@ -60,20 +56,32 @@ async function getCache({ supabaseClient }) {
         const alliance = alliancesById.get(party?.alliance_id);
 
         return {
+          person_id: person.person_id,
           name: person.name,
+          party_id: party?.party_id ?? null,
           party: party?.abbreviation ?? null,
           party_name: party?.name ?? null,
+          alliance_id: alliance?.alliance_id ?? null,
           alliance: alliance?.abbreviation ?? null,
           alliance_name: alliance?.name ?? null,
         };
       })
       .sort((left, right) => compareAlphabetically(left.name, right.name)),
-    parties: unique(parties.map((party) => party.abbreviation)).sort(compareAlphabetically),
-    party_names: unique(parties.map((party) => party.name)).sort(compareAlphabetically),
-    alliances: unique(alliances.map((alliance) => alliance.abbreviation)).sort(
-      compareAlphabetically
-    ),
-    alliance_names: unique(alliances.map((alliance) => alliance.name)).sort(compareAlphabetically),
+    parties: parties
+      .map((party) => ({
+        party_id: party.party_id,
+        alliance_id: party.alliance_id,
+        name: party.name,
+        abbreviation: party.abbreviation,
+      }))
+      .sort((left, right) => compareAlphabetically(left.name, right.name)),
+    alliances: alliances
+      .map((alliance) => ({
+        alliance_id: alliance.alliance_id,
+        name: alliance.name,
+        abbreviation: alliance.abbreviation,
+      }))
+      .sort((left, right) => compareAlphabetically(left.name, right.name)),
   };
 }
 

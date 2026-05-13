@@ -39,24 +39,40 @@ Returns:
   "version_id": 7,
   "persons": [
     {
+      "person_id": 1,
       "name": "string",
+      "party_id": "integer or null",
       "party": "string or null",
       "party_name": "string or null",
+      "alliance_id": "integer or null",
       "alliance": "string or null",
       "alliance_name": "string or null"
     }
   ],
-  "parties": ["string"],
-  "party_names": ["string"],
-  "alliances": ["string"],
-  "alliance_names": ["string"]
+  "parties": [
+    {
+      "party_id": 1,
+      "alliance_id": 1,
+      "name": "string",
+      "abbreviation": "string"
+    }
+  ],
+  "alliances": [
+    {
+      "alliance_id": 1,
+      "name": "string",
+      "abbreviation": "string"
+    }
+  ]
 }
 ```
 
 Notes:
 - `version_id` is read from `version_log.value` where `key = 'version_id'`.
 - `persons` are sorted alphabetically by `name`.
-- `parties`, `party_names`, `alliances`, and `alliance_names` are unique sorted arrays.
+- `persons[].person_id` is always returned.
+- `persons[].party_id` and `persons[].alliance_id` are returned when a linked party/alliance exists, otherwise `null`.
+- `parties` and `alliances` are object arrays sorted alphabetically by `name`.
 - Non-politician persons return `null` for party and alliance fields.
 
 ## GET /threadsList
