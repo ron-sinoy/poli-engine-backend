@@ -35,17 +35,23 @@ function createSourceidClient({ sourceids = [], loadError = null, insertError = 
   };
 }
 
-test('loadSourceids reads source_id rows from pipeline_metadata', async () => {
+test('loadSourceids reads source_id and status rows from pipeline_metadata', async () => {
   const supabaseClient = createSourceidClient({
-    sourceids: [{ source_id: 17 }, { source_id: 'abc-123' }],
+    sourceids: [
+      { source_id: 17, status: 'pending' },
+      { source_id: 'abc-123', status: 'complete' },
+    ],
   });
 
   const result = await loadSourceids({ supabaseClient });
 
-  assert.deepEqual(result, [{ source_id: 17 }, { source_id: 'abc-123' }]);
+  assert.deepEqual(result, [
+    { source_id: 17, status: 'pending' },
+    { source_id: 'abc-123', status: 'complete' },
+  ]);
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['select', 'pipeline_metadata', 'source_id'],
+    ['select', 'pipeline_metadata', 'source_id,status'],
   ]);
 });
 
@@ -60,36 +66,38 @@ test('loadSourceids maps Supabase read failures to AppError', async () => {
   );
 });
 
-test('insertSourceid inserts source_id into pipeline_metadata without updating version_id', async () => {
+test('insertSourceid inserts source_id and status into pipeline_metadata without updating version_id', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
     supabaseClient,
     payload: {
       source_id: 17,
+      status: 'pending',
     },
   });
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['insert', 'pipeline_metadata', { source_id: 17 }],
+    ['insert', 'pipeline_metadata', { source_id: 17, status: 'pending' }],
   ]);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
-test('insertSourceid trims and inserts string source_id values', async () => {
+test('insertSourceid trims and inserts string source_id and status values', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
     supabaseClient,
     payload: {
       source_id: '  abc-123  ',
+      status: '  complete  ',
     },
   });
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['insert', 'pipeline_metadata', { source_id: 'abc-123' }],
+    ['insert', 'pipeline_metadata', { source_id: 'abc-123', status: 'complete' }],
   ]);
 });
 
@@ -127,6 +135,24 @@ test('insertSourceid rejects invalid source_id types', async () => {
   );
 });
 
+test('insertSourceid rejects missing status', async () => {
+  const supabaseClient = createSourceidClient({});
+
+  await assert.rejects(
+    () =>
+      insertSourceid({
+        supabaseClient,
+        payload: {
+          source_id: 17,
+        },
+      }),
+    (error) =>
+      error instanceof AppError &&
+      error.statusCode === 422 &&
+      error.message === 'status is required'
+  );
+});
+
 test('insertSourceid maps Supabase insert failures to AppError', async () => {
   const supabaseClient = createSourceidClient({
     insertError: { message: 'insert failed' },
@@ -138,6 +164,7 @@ test('insertSourceid maps Supabase insert failures to AppError', async () => {
         supabaseClient,
         payload: {
           source_id: 17,
+          status: 'pending',
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502

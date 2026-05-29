@@ -25,9 +25,18 @@ function validateSourceId(value) {
   throw new AppError(422, 'source_id must be a non-empty string or integer');
 }
 
+function validateStatus(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new AppError(422, 'status is required');
+  }
+
+  return value.trim();
+}
+
 function validateInsertSourceidPayload(payload = {}) {
   return {
     source_id: validateSourceId(payload.source_id),
+    status: validateStatus(payload.status),
   };
 }
 

@@ -69,3 +69,6 @@
 - [P34] Verified backend tests pass after the new read endpoint: 17 passed, 0 failed.
 - [P35] Extended `GET /cache` person rows to include corresponding `person_id`, `party_id`, and `alliance_id`, updated endpoint docs, and verified backend tests pass: 17 passed, 0 failed.
 - [P36] Reworked `GET /cache` top-level `parties` and `alliances` from split name/abbreviation arrays into structured object arrays, updated docs, and verified backend tests pass: 17 passed, 0 failed.
+
+## 2026-05-29
+- [P37] Updated `GET /sourceids` and `POST /sourceids` to include the new `status` text column in `pipeline_metadata`, added validation/tests, and verified backend tests pass: 16 passed, 0 failed.

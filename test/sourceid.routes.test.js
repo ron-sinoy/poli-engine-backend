@@ -26,10 +26,13 @@ function createSourceidRouteClient({ sourceids = [], loadError = null, insertErr
   };
 }
 
-test('GET /sourceids returns source_id rows', async () => {
+test('GET /sourceids returns source_id and status rows', async () => {
   const app = createApp({
     supabaseClient: createSourceidRouteClient({
-      sourceids: [{ source_id: 17 }, { source_id: 'abc-123' }],
+      sourceids: [
+        { source_id: 17, status: 'pending' },
+        { source_id: 'abc-123', status: 'complete' },
+      ],
     }),
   });
 
@@ -39,10 +42,13 @@ test('GET /sourceids returns source_id rows', async () => {
   });
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, [{ source_id: 17 }, { source_id: 'abc-123' }]);
+  assert.deepEqual(response.body, [
+    { source_id: 17, status: 'pending' },
+    { source_id: 'abc-123', status: 'complete' },
+  ]);
 });
 
-test('POST /sourceids inserts source_id and returns success', async () => {
+test('POST /sourceids inserts source_id and status and returns success', async () => {
   const app = createApp({
     supabaseClient: createSourceidRouteClient({}),
   });
@@ -52,6 +58,7 @@ test('POST /sourceids inserts source_id and returns success', async () => {
     url: '/sourceids',
     body: {
       source_id: 17,
+      status: 'pending',
     },
   });
 

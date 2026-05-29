@@ -1,7 +1,7 @@
 'use strict';
 
 async function loadSourceids({ supabaseClient }) {
-  return supabaseClient.from('pipeline_metadata').select('source_id');
+  return supabaseClient.from('pipeline_metadata').select('source_id,status');
 }
 
 async function insertSourceid({ supabaseClient, metadata }) {
