@@ -56,6 +56,30 @@ async function loadThreadProgressOrFail({ supabaseClient, threadId }) {
   return data;
 }
 
+async function loadWaitingListIncidentsVectors({ supabaseClient }) {
+  const { data, error } = await incidentRepository.loadWaitingListIncidentsVectors({
+    supabaseClient,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to load waiting list incident vectors from Supabase', error);
+  }
+
+  return data || [];
+}
+
+async function loadWaitingListIncidentsContent({ supabaseClient }) {
+  const { data, error } = await incidentRepository.loadWaitingListIncidentsContent({
+    supabaseClient,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to load waiting list incident content from Supabase', error);
+  }
+
+  return data || [];
+}
+
 async function insertIncident({ supabaseClient, payload }) {
   const incident = validateInsertIncidentPayload(payload);
   const thread = await loadThreadProgressOrFail({
@@ -128,5 +152,7 @@ async function insertIncident({ supabaseClient, payload }) {
 }
 
 module.exports = {
+  loadWaitingListIncidentsVectors,
+  loadWaitingListIncidentsContent,
   insertIncident,
 };

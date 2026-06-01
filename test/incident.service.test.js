@@ -3,7 +3,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
-const { insertIncident } = require('../src/services/incident.service');
+const {
+  insertIncident,
+  loadWaitingListIncidentsContent,
+  loadWaitingListIncidentsVectors,
+} = require('../src/services/incident.service');
 
 function createIncidentClient({
   thread = { thread_id: 1, current_position: 2 },
@@ -82,6 +86,24 @@ function createIncidentClient({
             data: { value: this.wasUpdated ? 8 : 7 },
             error: this.wasUpdated ? versionUpdateError : versionReadError,
           };
+        },
+      };
+    },
+  };
+}
+
+function createWaitingListIncidentClient({ data = [], error = null }) {
+  const calls = [];
+
+  return {
+    calls,
+    from(tableName) {
+      calls.push(['from', tableName]);
+
+      return {
+        select(columns) {
+          calls.push(['select', tableName, columns]);
+          return Promise.resolve({ data, error });
         },
       };
     },
@@ -199,6 +221,60 @@ test('insertIncident maps incident insert failures to AppError', async () => {
           persons_involved: [9],
         },
       }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('loadWaitingListIncidentsVectors reads id and vectors rows from waiting_list_incidents', async () => {
+  const incidents = [
+    { id: 1, vectors: [0.1, 0.2] },
+    { id: 2, vectors: [0.3, 0.4] },
+  ];
+  const supabaseClient = createWaitingListIncidentClient({ data: incidents });
+
+  const result = await loadWaitingListIncidentsVectors({ supabaseClient });
+
+  assert.deepEqual(result, incidents);
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'waiting_list_incidents'],
+    ['select', 'waiting_list_incidents', 'id,vectors'],
+  ]);
+});
+
+test('loadWaitingListIncidentsContent reads id and content rows from waiting_list_incidents', async () => {
+  const incidents = [
+    { id: 1, content: 'Alpha' },
+    { id: 2, content: 'Beta' },
+  ];
+  const supabaseClient = createWaitingListIncidentClient({ data: incidents });
+
+  const result = await loadWaitingListIncidentsContent({ supabaseClient });
+
+  assert.deepEqual(result, incidents);
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'waiting_list_incidents'],
+    ['select', 'waiting_list_incidents', 'id,content'],
+  ]);
+});
+
+test('loadWaitingListIncidentsVectors maps Supabase read failures to AppError', async () => {
+  const supabaseClient = createWaitingListIncidentClient({
+    error: { message: 'read failed' },
+  });
+
+  await assert.rejects(
+    () => loadWaitingListIncidentsVectors({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('loadWaitingListIncidentsContent maps Supabase read failures to AppError', async () => {
+  const supabaseClient = createWaitingListIncidentClient({
+    error: { message: 'read failed' },
+  });
+
+  await assert.rejects(
+    () => loadWaitingListIncidentsContent({ supabaseClient }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

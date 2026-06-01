@@ -2,6 +2,7 @@
 
 const THREADS_TABLE = 'threads';
 const THREAD_LIST_COLUMNS = 'thread_id,title,summary,updated_at';
+const THREAD_INTERNAL_COLUMNS = 'thread_id,title,summary,updated_at,vectors';
 const THREAD_DETAIL_COLUMNS = 'thread_id,title,summary,updated_at';
 const THREAD_PROGRESS_COLUMNS = 'thread_id,current_position';
 
@@ -10,6 +11,13 @@ async function loadThreadsList({ supabaseClient }) {
   return supabaseClient
     .from(THREADS_TABLE)
     .select(THREAD_LIST_COLUMNS)
+    .order('updated_at', { ascending: false });
+}
+
+async function loadThreadsInternal({ supabaseClient }) {
+  return supabaseClient
+    .from(THREADS_TABLE)
+    .select(THREAD_INTERNAL_COLUMNS)
     .order('updated_at', { ascending: false });
 }
 
@@ -104,6 +112,7 @@ async function loadAlliancesByIds({ supabaseClient, allianceIds }) {
 
 module.exports = {
   loadThreadsList,
+  loadThreadsInternal,
   insertThread,
   getThreadById,
   getThreadProgressById,

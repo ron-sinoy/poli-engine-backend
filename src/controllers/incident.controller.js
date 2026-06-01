@@ -20,6 +20,24 @@ async function insertIncident(request, response) {
   });
 }
 
+async function loadVectorWaitingListIncidents(request, response) {
+  const incidents = await incidentService.loadWaitingListIncidentsVectors({
+    supabaseClient: resolveSupabaseClient(request),
+  });
+
+  response.json(incidents);
+}
+
+async function loadContentWaitingListIncidents(request, response) {
+  const incidents = await incidentService.loadWaitingListIncidentsContent({
+    supabaseClient: resolveSupabaseClient(request),
+  });
+
+  response.json(incidents);
+}
+
 module.exports = {
   insertIncident,
+  loadVectorWaitingListIncidents,
+  loadContentWaitingListIncidents,
 };

@@ -75,6 +75,16 @@ async function loadThreadsList({ supabaseClient }) {
   return data || [];
 }
 
+async function loadThreadsInternal({ supabaseClient }) {
+  const { data, error } = await threadRepository.loadThreadsInternal({ supabaseClient });
+
+  if (error) {
+    throw new AppError(502, 'Failed to load internal threads from Supabase', error);
+  }
+
+  return data || [];
+}
+
 async function insertThread({ supabaseClient, payload }) {
   const title = requireNonEmptyString(payload?.title, 'title');
   const summary = requireNonEmptyString(payload?.summary, 'summary');
@@ -260,4 +270,4 @@ async function getThreadById({ supabaseClient, threadId }) {
   };
 }
 
-module.exports = { loadThreadsList, insertThread, getThreadById };
+module.exports = { loadThreadsList, loadThreadsInternal, insertThread, getThreadById };

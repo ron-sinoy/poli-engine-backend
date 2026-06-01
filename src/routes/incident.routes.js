@@ -7,5 +7,13 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.post('/incidents', asyncHandler(incidentController.insertIncident));
+router.get(
+  '/vector_waiting_list_incidents',
+  asyncHandler(incidentController.loadVectorWaitingListIncidents)
+);
+router.get(
+  '/content_waiting-list_incidents',
+  asyncHandler(incidentController.loadContentWaitingListIncidents)
+);
 
 module.exports = router;

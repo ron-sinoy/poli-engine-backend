@@ -64,6 +64,15 @@ This file reflects the current backend implementation in `src/`.
 - Not fetched from table already queried:
   - `threads`: `created_at`, `current_position`
 
+## GET /threadsInternal
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `threads`: `thread_id`, `title`, `summary`, `updated_at`, `vectors`
+- Not fetched from table already queried:
+  - `threads`: `created_at`, `current_position`
+
 ## GET /threads/:id
 
 - Inserts/updates:
@@ -188,6 +197,28 @@ This file reflects the current backend implementation in `src/`.
   - No read is performed against `persons` to validate `persons_involved`
   - Returns `{ success: true, entry_id }`
 
+## GET /vector_waiting_list_incidents
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `waiting_list_incidents`: `id`, `vectors`
+- Not fetched from tables already queried:
+  - `waiting_list_incidents`: `content`
+- Response shaping notes:
+  - Returns rows exactly as stored for `id` and `vectors`
+
+## GET /content_waiting-list_incidents
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `waiting_list_incidents`: `id`, `content`
+- Not fetched from tables already queried:
+  - `waiting_list_incidents`: `vectors`
+- Response shaping notes:
+  - Returns rows exactly as stored for `id` and `content`
+
 ## POST /parties
 
 - Inserts/updates:
@@ -206,6 +237,28 @@ This file reflects the current backend implementation in `src/`.
   - `version_log`: `key` is never selected
 - Additional notes:
   - No read is performed against `alliances`; `alliance_id` is accepted from the request and inserted directly
+
+## GET /sourceids
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `pipeline_metadata`: `source_id`, `status`
+- Not fetched from table already queried:
+  - `pipeline_metadata`: no other columns are selected
+
+## POST /sourceids
+
+- Inserts/updates:
+  - `pipeline_metadata` insert:
+    - `source_id`
+    - `status`
+- Fetches:
+  - None
+- Not fetched/read back from tables already touched:
+  - `pipeline_metadata`: inserted columns are not read back
+- Additional notes:
+  - `status` is a required text body field
 
 ## GET /version
 

@@ -72,3 +72,9 @@
 
 ## 2026-05-29
 - [P37] Updated `GET /sourceids` and `POST /sourceids` to include the new `status` text column in `pipeline_metadata`, added validation/tests, and verified backend tests pass: 16 passed, 0 failed.
+
+## 2026-06-01
+- [P38] Added `GET /threadsInternal` as a separate thread-list fetch that returns `vectors` alongside the existing thread list fields, wired it through controller/service/repository, and added route/service tests.
+- [P38] Documented `GET /threadsInternal` plus the existing `GET /sourceids` and `POST /sourceids` `status` field in the backend endpoint docs, then verified backend tests pass: 16 passed, 0 failed.
+- [P39] Added `GET /vector_waiting_list_incidents` and `GET /content_waiting-list_incidents` as read-only waiting-list incident endpoints returning `id,vectors` and `id,content`, wired them through the incident stack, and verified backend tests pass: 16 passed, 0 failed.
+- [P40] Created `newly_created_endpoints.md` listing the latest endpoints in creation order with `http://localhost:3000` URLs and request-body notes.

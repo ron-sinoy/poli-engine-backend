@@ -3,7 +3,12 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
-const { getThreadById, insertThread, loadThreadsList } = require('../src/services/thread.service');
+const {
+  getThreadById,
+  insertThread,
+  loadThreadsInternal,
+  loadThreadsList,
+} = require('../src/services/thread.service');
 
 function createThreadsClient({ data, error = null }) {
   const calls = [];
@@ -69,6 +74,47 @@ test('loadThreadsList maps Supabase failures to AppError', async () => {
 
   await assert.rejects(
     () => loadThreadsList({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('loadThreadsInternal reads threads ordered by updated_at descending with vectors', async () => {
+  const threads = [
+    {
+      thread_id: 2,
+      title: 'Updated topic',
+      summary: 'Latest summary',
+      updated_at: '2026-04-11T10:00:00Z',
+      vectors: [0.1, 0.2, 0.3],
+    },
+    {
+      thread_id: 1,
+      title: 'Older topic',
+      summary: 'Older summary',
+      updated_at: '2026-04-10T10:00:00Z',
+      vectors: [0.4, 0.5, 0.6],
+    },
+  ];
+  const supabaseClient = createThreadsClient({ data: threads });
+
+  const result = await loadThreadsInternal({ supabaseClient });
+
+  assert.deepEqual(result, threads);
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'threads'],
+    ['select', 'thread_id,title,summary,updated_at,vectors'],
+    ['order', 'updated_at', { ascending: false }],
+  ]);
+});
+
+test('loadThreadsInternal maps Supabase failures to AppError', async () => {
+  const supabaseClient = createThreadsClient({
+    data: null,
+    error: { message: 'database unavailable' },
+  });
+
+  await assert.rejects(
+    () => loadThreadsInternal({ supabaseClient }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

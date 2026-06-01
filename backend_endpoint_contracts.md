@@ -100,6 +100,33 @@ Notes:
 - The current repository orders threads by `updated_at` descending.
 - `created_at` and `current_position` are not returned.
 
+## GET /threadsInternal
+
+Purpose:
+- Loads the list of threads for internal consumers.
+
+User inputs:
+- None.
+
+Returns:
+
+```json
+[
+  {
+    "thread_id": 1,
+    "title": "string",
+    "summary": "string",
+    "updated_at": "ISO timestamp or null",
+    "vectors": "array or null"
+  }
+]
+```
+
+Notes:
+- The current repository orders threads by `updated_at` descending.
+- `created_at` and `current_position` are not returned.
+- `vectors` is returned as stored in Supabase.
+
 ## GET /threads/:id
 
 Purpose:
@@ -176,6 +203,56 @@ Notes:
 - `alliance.color` can be `null`.
 - `source_url` is not currently returned for incidents or quotes.
 - Helper ids such as `entry_id`, `speaker_id`, `person_id`, `party_id`, and `alliance_id` are not returned.
+
+## GET /sourceids
+
+Purpose:
+- Loads source id rows from `pipeline_metadata`.
+
+User inputs:
+- None.
+
+Returns:
+
+```json
+[
+  {
+    "source_id": "integer or string",
+    "status": "string"
+  }
+]
+```
+
+Notes:
+- `source_id` is returned exactly as stored.
+- `status` is included as a text field.
+
+## POST /sourceids
+
+Purpose:
+- Creates a source id row in `pipeline_metadata`.
+
+User inputs:
+
+```json
+{
+  "source_id": 17,
+  "status": "pending"
+}
+```
+
+Automatic inputs / server-managed values:
+- None.
+
+Returns:
+
+```json
+{ "success": true }
+```
+
+Notes:
+- `source_id` must be a non-empty string or integer.
+- `status` must be a non-empty string.
 
 ## POST /threads
 
@@ -288,6 +365,52 @@ Notes:
 - Clients do not send `published_at`; the service generates it.
 - The service does not pre-check that `persons_involved` person ids exist.
 - This endpoint currently does not bump `version_log`.
+
+## GET /vector_waiting_list_incidents
+
+Purpose:
+- Loads waiting list incidents with `id` and `vectors`.
+
+User inputs:
+- None.
+
+Returns:
+
+```json
+[
+  {
+    "id": 1,
+    "vectors": "array or null"
+  }
+]
+```
+
+Notes:
+- Reads from `waiting_list_incidents`.
+- Returns rows exactly as stored for `id` and `vectors`.
+
+## GET /content_waiting-list_incidents
+
+Purpose:
+- Loads waiting list incidents with `id` and `content`.
+
+User inputs:
+- None.
+
+Returns:
+
+```json
+[
+  {
+    "id": 1,
+    "content": "string or null"
+  }
+]
+```
+
+Notes:
+- Reads from `waiting_list_incidents`.
+- Returns rows exactly as stored for `id` and `content`.
 
 ## POST /persons
 

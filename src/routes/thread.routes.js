@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.post('/threads', asyncHandler(threadController.insertThread));
 router.get('/threadsList', asyncHandler(threadController.loadThreadsList));
+router.get('/threadsInternal', asyncHandler(threadController.loadThreadsInternal));
 router.get('/threads/:id', asyncHandler(threadController.getThreadById));
 
 module.exports = router;

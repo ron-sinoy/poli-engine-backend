@@ -126,6 +126,33 @@ test('GET /threadsList returns threads as an array', async () => {
   assert.deepEqual(response.body, threads);
 });
 
+test('GET /threadsInternal returns threads with vectors', async () => {
+  const threads = [
+    {
+      thread_id: 2,
+      title: 'Updated topic',
+      summary: 'Latest summary',
+      updated_at: '2026-04-11T10:00:00Z',
+      vectors: [0.1, 0.2, 0.3],
+    },
+    {
+      thread_id: 1,
+      title: 'Older topic',
+      summary: 'Older summary',
+      updated_at: '2026-04-10T10:00:00Z',
+      vectors: [0.4, 0.5, 0.6],
+    },
+  ];
+  const app = createApp({
+    supabaseClient: createThreadsClient({ data: threads }),
+  });
+
+  const response = await invokeApp(app, { method: 'GET', url: '/threadsInternal' });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, threads);
+});
+
 function createThreadByIdClient({ thread }) {
   return {
     from(tableName) {

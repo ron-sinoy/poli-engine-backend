@@ -5,13 +5,20 @@ const test = require('node:test');
 const { createApp } = require('../src/app');
 const { invokeApp } = require('../test_utils/invokeApp');
 
-function createIncidentRouteClient({ entryId = 11 }) {
+function createIncidentRouteClient({ entryId = 11, waitingListIncidents = [], waitingListError = null }) {
   return {
     from(tableName) {
       return {
         tableName,
         wasUpdated: false,
         select() {
+          if (tableName === 'waiting_list_incidents') {
+            return Promise.resolve({
+              data: waitingListIncidents,
+              error: waitingListError,
+            });
+          }
+
           return this;
         },
         insert() {
@@ -95,4 +102,40 @@ test('POST /incidents returns validation errors for invalid payloads', async () 
   assert.deepEqual(response.body, {
     error: 'persons_involved must be an array',
   });
+});
+
+test('GET /vector_waiting_list_incidents returns waiting list incident vectors', async () => {
+  const waitingListIncidents = [
+    { id: 1, vectors: [0.1, 0.2] },
+    { id: 2, vectors: [0.3, 0.4] },
+  ];
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({ waitingListIncidents }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'GET',
+    url: '/vector_waiting_list_incidents',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, waitingListIncidents);
+});
+
+test('GET /content_waiting-list_incidents returns waiting list incident content', async () => {
+  const waitingListIncidents = [
+    { id: 1, content: 'Alpha' },
+    { id: 2, content: 'Beta' },
+  ];
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({ waitingListIncidents }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'GET',
+    url: '/content_waiting-list_incidents',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, waitingListIncidents);
 });
