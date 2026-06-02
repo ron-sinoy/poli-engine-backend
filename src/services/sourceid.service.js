@@ -33,7 +33,7 @@ function validateStatus(value) {
   return value.trim();
 }
 
-function validateInsertSourceidPayload(payload = {}) {
+function validateSourceidPayload(payload = {}) {
   return {
     source_id: validateSourceId(payload.source_id),
     status: validateStatus(payload.status),
@@ -53,7 +53,7 @@ async function loadSourceids({ supabaseClient }) {
 }
 
 async function insertSourceid({ supabaseClient, payload }) {
-  const metadata = validateInsertSourceidPayload(payload);
+  const metadata = validateSourceidPayload(payload);
   const { error } = await sourceidRepository.insertSourceid({
     supabaseClient,
     metadata,
@@ -64,7 +64,24 @@ async function insertSourceid({ supabaseClient, payload }) {
   }
 }
 
+async function updateSourceid({ supabaseClient, payload }) {
+  const metadata = validateSourceidPayload(payload);
+  const { data, error } = await sourceidRepository.updateSourceid({
+    supabaseClient,
+    metadata,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to update source_id in Supabase', error);
+  }
+
+  if (!data) {
+    throw new AppError(404, 'source_id was not found in pipeline_metadata');
+  }
+}
+
 module.exports = {
   loadSourceids,
   insertSourceid,
+  updateSourceid,
 };

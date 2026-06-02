@@ -78,3 +78,7 @@
 - [P38] Documented `GET /threadsInternal` plus the existing `GET /sourceids` and `POST /sourceids` `status` field in the backend endpoint docs, then verified backend tests pass: 16 passed, 0 failed.
 - [P39] Added `GET /vector_waiting_list_incidents` and `GET /content_waiting-list_incidents` as read-only waiting-list incident endpoints returning `id,vectors` and `id,content`, wired them through the incident stack, and verified backend tests pass: 16 passed, 0 failed.
 - [P40] Created `newly_created_endpoints.md` listing the latest endpoints in creation order with `http://localhost:3000` URLs and request-body notes.
+
+## 2026-06-02
+- [P41] Created `endpoints_by_method.md` with the current HTTP endpoints grouped under `GET` and `POST`, then appended this log entry as required.
+- [P42] Added `POST /sourceids/update` to update `pipeline_metadata.status` by `source_id`, wired controller-service-repository support, documented the endpoint, and verified the backend test suite passes: 16 passed, 0 failed.

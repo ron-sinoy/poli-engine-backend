@@ -19,6 +19,17 @@ async function insertSourceid(request, response) {
   });
 }
 
+async function updateSourceid(request, response) {
+  await sourceidService.updateSourceid({
+    supabaseClient: resolveSupabaseClient(request),
+    payload: request.body,
+  });
+
+  response.json({
+    success: true,
+  });
+}
+
 async function loadSourceids(request, response) {
   const sourceids = await sourceidService.loadSourceids({
     supabaseClient: resolveSupabaseClient(request),
@@ -30,4 +41,5 @@ async function loadSourceids(request, response) {
 module.exports = {
   loadSourceids,
   insertSourceid,
+  updateSourceid,
 };

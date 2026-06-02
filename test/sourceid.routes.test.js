@@ -5,7 +5,13 @@ const test = require('node:test');
 const { createApp } = require('../src/app');
 const { invokeApp } = require('../test_utils/invokeApp');
 
-function createSourceidRouteClient({ sourceids = [], loadError = null, insertError = null }) {
+function createSourceidRouteClient({
+  sourceids = [],
+  loadError = null,
+  insertError = null,
+  updateError = null,
+  updateData = { source_id: 17, status: 'complete' },
+}) {
   return {
     from() {
       return {
@@ -20,6 +26,28 @@ function createSourceidRouteClient({ sourceids = [], loadError = null, insertErr
             data: null,
             error: insertError,
           });
+        },
+        update(payload) {
+          return {
+            eq(columnName, value) {
+              return {
+                select(columns) {
+                  return {
+                    limit(limitValue) {
+                      return {
+                        maybeSingle() {
+                          return Promise.resolve({
+                            data: updateData && value === updateData.source_id ? updateData : null,
+                            error: updateError,
+                          });
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            },
+          };
         },
       };
     },
@@ -84,5 +112,25 @@ test('POST /sourceids returns validation errors for invalid payloads', async () 
   assert.equal(response.statusCode, 422);
   assert.deepEqual(response.body, {
     error: 'source_id is required',
+  });
+});
+
+test('POST /sourceids/update updates source_id status and returns success', async () => {
+  const app = createApp({
+    supabaseClient: createSourceidRouteClient({}),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/sourceids/update',
+    body: {
+      source_id: 17,
+      status: 'complete',
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, {
+    success: true,
   });
 });

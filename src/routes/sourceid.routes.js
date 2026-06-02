@@ -8,5 +8,6 @@ const router = express.Router();
 
 router.get('/sourceids', asyncHandler(sourceidController.loadSourceids));
 router.post('/sourceids', asyncHandler(sourceidController.insertSourceid));
+router.post('/sourceids/update', asyncHandler(sourceidController.updateSourceid));
 
 module.exports = router;

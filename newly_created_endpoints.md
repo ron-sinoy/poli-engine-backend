@@ -51,3 +51,22 @@ null
 Notes:
 - This is a `GET` endpoint, so it does not take a request body.
 - Returns rows from `waiting_list_incidents` with `id` and `content`.
+
+## 4. `POST /sourceids/update`
+
+URL:
+
+`http://localhost:3000/sourceids/update`
+
+Input JSON:
+
+```json
+{
+  "source_id": 17,
+  "status": "complete"
+}
+```
+
+Notes:
+- Updates one `pipeline_metadata` row by `source_id`.
+- This endpoint does not take a path parameter.

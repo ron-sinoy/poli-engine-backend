@@ -260,6 +260,20 @@ This file reflects the current backend implementation in `src/`.
 - Additional notes:
   - `status` is a required text body field
 
+## POST /sourceids/update
+
+- Inserts/updates:
+  - `pipeline_metadata` update:
+    - `status`
+- Fetches:
+  - `pipeline_metadata`: `source_id`, `status`
+- Not fetched/read back from tables already touched:
+  - `pipeline_metadata`: updated columns are not read back before the update executes
+- Additional notes:
+  - The update is filtered by `source_id`
+  - `status` is a required text body field
+  - This endpoint does not update `version_log`
+
 ## GET /version
 
 - Inserts/updates:

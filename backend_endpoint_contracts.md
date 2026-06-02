@@ -254,6 +254,35 @@ Notes:
 - `source_id` must be a non-empty string or integer.
 - `status` must be a non-empty string.
 
+## POST /sourceids/update
+
+Purpose:
+- Updates the `status` of a source id row in `pipeline_metadata`.
+
+User inputs:
+
+```json
+{
+  "source_id": 17,
+  "status": "complete"
+}
+```
+
+Automatic inputs / server-managed values:
+- None.
+
+Returns:
+
+```json
+{ "success": true }
+```
+
+Notes:
+- `source_id` must be a non-empty string or integer.
+- `status` must be a non-empty string.
+- The service updates a single row by `source_id`.
+- This endpoint currently does not bump `version_log`.
+
 ## POST /threads
 
 Purpose:
