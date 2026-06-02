@@ -5,7 +5,12 @@ const test = require('node:test');
 const { createApp } = require('../src/app');
 const { invokeApp } = require('../test_utils/invokeApp');
 
-function createIncidentRouteClient({ entryId = 11, waitingListIncidents = [], waitingListError = null }) {
+function createIncidentRouteClient({
+  entryId = 11,
+  waitingListIncidents = [],
+  waitingListError = null,
+  waitingListInsertError = null,
+}) {
   return {
     from(tableName) {
       return {
@@ -22,6 +27,13 @@ function createIncidentRouteClient({ entryId = 11, waitingListIncidents = [], wa
           return this;
         },
         insert() {
+          if (tableName === 'waiting_list_incidents') {
+            return Promise.resolve({
+              data: null,
+              error: waitingListInsertError,
+            });
+          }
+
           return this;
         },
         update() {
@@ -132,10 +144,68 @@ test('GET /content_waiting-list_incidents returns waiting list incident content'
   });
 
   const response = await invokeApp(app, {
-    method: 'GET',
-    url: '/content_waiting-list_incidents',
+        method: 'GET',
+        url: '/content_waiting-list_incidents',
   });
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, waitingListIncidents);
+});
+
+test('POST /waitinglists inserts a waiting list row and returns success', async () => {
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({}),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/waitinglists',
+    body: {
+      content: 'Alpha',
+      vectors: [0.1, 0.2],
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, {
+    success: true,
+  });
+});
+
+test('POST /waitinglists returns validation errors for missing content', async () => {
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({}),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/waitinglists',
+    body: {
+      vectors: [0.1, 0.2],
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.body, {
+    error: 'content is required',
+  });
+});
+
+test('POST /waitinglists returns validation errors for missing vectors', async () => {
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({}),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/waitinglists',
+    body: {
+      content: 'Alpha',
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.body, {
+    error: 'vectors is required',
+  });
 });

@@ -30,12 +30,31 @@ function requireIntegerArray(values, fieldName) {
   return values.map((value) => requireInteger(value, `${fieldName} item`));
 }
 
+function validateVectors(value) {
+  if (value === undefined || value === null) {
+    throw new AppError(422, 'vectors is required');
+  }
+
+  if (!Array.isArray(value)) {
+    throw new AppError(422, 'vectors must be an array');
+  }
+
+  return value;
+}
+
 function validateInsertIncidentPayload(payload = {}) {
   return {
     thread_id: requireInteger(payload.thread_id, 'thread_id'),
     body: requireNonEmptyString(payload.body, 'body'),
     source_url: requireNonEmptyString(payload.source_url, 'source_url'),
     persons_involved: requireIntegerArray(payload.persons_involved, 'persons_involved'),
+  };
+}
+
+function validateInsertWaitingListPayload(payload = {}) {
+  return {
+    content: requireNonEmptyString(payload.content, 'content'),
+    vectors: validateVectors(payload.vectors),
   };
 }
 
@@ -151,8 +170,21 @@ async function insertIncident({ supabaseClient, payload }) {
   return timelineEntry.entry_id;
 }
 
+async function insertWaitingList({ supabaseClient, payload }) {
+  const waitingListRow = validateInsertWaitingListPayload(payload);
+  const { error } = await incidentRepository.insertWaitingList({
+    supabaseClient,
+    waitingListRow,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to insert waiting list row into Supabase', error);
+  }
+}
+
 module.exports = {
   loadWaitingListIncidentsVectors,
   loadWaitingListIncidentsContent,
   insertIncident,
+  insertWaitingList,
 };

@@ -27,6 +27,10 @@ async function insertIncidentPersons({ supabaseClient, rows }) {
     .select('entry_id');
 }
 
+async function insertWaitingList({ supabaseClient, waitingListRow }) {
+  return supabaseClient.from(WAITING_LIST_INCIDENTS_TABLE).insert(waitingListRow);
+}
+
 async function loadWaitingListIncidentsVectors({ supabaseClient }) {
   return supabaseClient.from(WAITING_LIST_INCIDENTS_TABLE).select('id,vectors');
 }
@@ -39,6 +43,7 @@ module.exports = {
   insertTimelineEntry,
   insertIncident,
   insertIncidentPersons,
+  insertWaitingList,
   loadWaitingListIncidentsVectors,
   loadWaitingListIncidentsContent,
 };

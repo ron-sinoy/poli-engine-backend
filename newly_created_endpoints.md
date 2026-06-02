@@ -52,7 +52,26 @@ Notes:
 - This is a `GET` endpoint, so it does not take a request body.
 - Returns rows from `waiting_list_incidents` with `id` and `content`.
 
-## 4. `POST /sourceids/update`
+## 4. `POST /waitinglists`
+
+URL:
+
+`http://localhost:3000/waitinglists`
+
+Input JSON:
+
+```json
+{
+  "content": "Alpha",
+  "vectors": [0.1, 0.2]
+}
+```
+
+Notes:
+- Creates a row in `waiting_list_incidents`.
+- This endpoint does not return a row id.
+
+## 5. `POST /sourceids/update`
 
 URL:
 

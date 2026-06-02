@@ -219,6 +219,21 @@ This file reflects the current backend implementation in `src/`.
 - Response shaping notes:
   - Returns rows exactly as stored for `id` and `content`
 
+## POST /waitinglists
+
+- Inserts/updates:
+  - `waiting_list_incidents` insert:
+    - `content`
+    - `vectors`
+- Fetches:
+  - None
+- Not fetched/read back from tables already touched:
+  - `waiting_list_incidents`: inserted columns are not read back
+- Additional notes:
+  - `content` is a required text body field
+  - `vectors` is a required array body field
+  - This endpoint does not update `version_log`
+
 ## POST /parties
 
 - Inserts/updates:

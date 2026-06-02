@@ -5,6 +5,7 @@ const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
 const {
   insertIncident,
+  insertWaitingList,
   loadWaitingListIncidentsContent,
   loadWaitingListIncidentsVectors,
 } = require('../src/services/incident.service');
@@ -92,7 +93,7 @@ function createIncidentClient({
   };
 }
 
-function createWaitingListIncidentClient({ data = [], error = null }) {
+function createWaitingListIncidentClient({ data = [], error = null } = {}) {
   const calls = [];
 
   return {
@@ -104,6 +105,10 @@ function createWaitingListIncidentClient({ data = [], error = null }) {
         select(columns) {
           calls.push(['select', tableName, columns]);
           return Promise.resolve({ data, error });
+        },
+        insert(payload) {
+          calls.push(['insert', tableName, payload]);
+          return Promise.resolve({ data: null, error });
         },
       };
     },
@@ -275,6 +280,73 @@ test('loadWaitingListIncidentsContent maps Supabase read failures to AppError', 
 
   await assert.rejects(
     () => loadWaitingListIncidentsContent({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('insertWaitingList writes content and vectors to waiting_list_incidents without updating version_log', async () => {
+  const supabaseClient = createWaitingListIncidentClient();
+
+  await insertWaitingList({
+    supabaseClient,
+    payload: {
+      content: 'Alpha',
+      vectors: [0.1, 0.2],
+    },
+  });
+
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'waiting_list_incidents'],
+    ['insert', 'waiting_list_incidents', { content: 'Alpha', vectors: [0.1, 0.2] }],
+  ]);
+  assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
+});
+
+test('insertWaitingList rejects missing content', async () => {
+  const supabaseClient = createWaitingListIncidentClient();
+
+  await assert.rejects(
+    () =>
+      insertWaitingList({
+        supabaseClient,
+        payload: {
+          vectors: [0.1, 0.2],
+        },
+      }),
+    (error) => error instanceof AppError && error.statusCode === 422 && error.message === 'content is required'
+  );
+});
+
+test('insertWaitingList rejects missing vectors', async () => {
+  const supabaseClient = createWaitingListIncidentClient();
+
+  await assert.rejects(
+    () =>
+      insertWaitingList({
+        supabaseClient,
+        payload: {
+          content: 'Alpha',
+        },
+      }),
+    (error) =>
+      error instanceof AppError && error.statusCode === 422 && error.message === 'vectors is required'
+  );
+});
+
+test('insertWaitingList maps Supabase insert failures to AppError', async () => {
+  const supabaseClient = createWaitingListIncidentClient({
+    error: { message: 'insert failed' },
+  });
+
+  await assert.rejects(
+    () =>
+      insertWaitingList({
+        supabaseClient,
+        payload: {
+          content: 'Alpha',
+          vectors: [0.1, 0.2],
+        },
+      }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

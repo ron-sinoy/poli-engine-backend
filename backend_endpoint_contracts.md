@@ -441,6 +441,34 @@ Notes:
 - Reads from `waiting_list_incidents`.
 - Returns rows exactly as stored for `id` and `content`.
 
+## POST /waitinglists
+
+Purpose:
+- Creates a new row in `waiting_list_incidents`.
+
+User inputs:
+
+```json
+{
+  "content": "string",
+  "vectors": [0.1, 0.2]
+}
+```
+
+Automatic inputs / server-managed values:
+- None.
+
+Returns:
+
+```json
+{ "success": true }
+```
+
+Notes:
+- `content` must be a non-empty string.
+- `vectors` must be an array.
+- This endpoint currently does not bump `version_log`.
+
 ## POST /persons
 
 Purpose:

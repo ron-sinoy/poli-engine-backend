@@ -15,6 +15,7 @@
 - `/threads`
 - `/quotes`
 - `/incidents`
+- `/waitinglists`
 - `/persons`
 - `/parties`
 - `/sourceids`

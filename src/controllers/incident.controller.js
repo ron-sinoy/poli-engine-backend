@@ -20,6 +20,17 @@ async function insertIncident(request, response) {
   });
 }
 
+async function insertWaitingList(request, response) {
+  await incidentService.insertWaitingList({
+    supabaseClient: resolveSupabaseClient(request),
+    payload: request.body,
+  });
+
+  response.json({
+    success: true,
+  });
+}
+
 async function loadVectorWaitingListIncidents(request, response) {
   const incidents = await incidentService.loadWaitingListIncidentsVectors({
     supabaseClient: resolveSupabaseClient(request),
@@ -38,6 +49,7 @@ async function loadContentWaitingListIncidents(request, response) {
 
 module.exports = {
   insertIncident,
+  insertWaitingList,
   loadVectorWaitingListIncidents,
   loadContentWaitingListIncidents,
 };

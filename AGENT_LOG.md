@@ -82,3 +82,4 @@
 ## 2026-06-02
 - [P41] Created `endpoints_by_method.md` with the current HTTP endpoints grouped under `GET` and `POST`, then appended this log entry as required.
 - [P42] Added `POST /sourceids/update` to update `pipeline_metadata.status` by `source_id`, wired controller-service-repository support, documented the endpoint, and verified the backend test suite passes: 16 passed, 0 failed.
+- [P43] Added `POST /waitinglists` to insert rows into `waiting_list_incidents` with `content` and `vectors`, wired route/service/repository support, documented the endpoint, and verified the backend test suite passes: 16 passed, 0 failed.

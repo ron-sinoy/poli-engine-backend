@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.post('/incidents', asyncHandler(incidentController.insertIncident));
+router.post('/waitinglists', asyncHandler(incidentController.insertWaitingList));
 router.get(
   '/vector_waiting_list_incidents',
   asyncHandler(incidentController.loadVectorWaitingListIncidents)
