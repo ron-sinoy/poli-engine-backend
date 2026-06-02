@@ -95,7 +95,8 @@ async function insertThread({ supabaseClient, payload }) {
       title,
       summary,
       created_at: timestamp,
-      updated_at: null,
+      updated_at: payload?.updated_at ?? timestamp,
+      vectors: payload?.vectors ?? null,
       current_position: 0,
     },
   });

@@ -170,7 +170,7 @@ function createInsertThreadClient({ insertedThreadId = 5, insertError = null, up
   };
 }
 
-test('insertThread inserts a thread without updating version_id', async () => {
+test('insertThread inserts a thread with server-managed timestamps', async () => {
   const supabaseClient = createInsertThreadClient({});
 
   const threadId = await insertThread({
@@ -187,10 +187,27 @@ test('insertThread inserts a thread without updating version_id', async () => {
   assert.equal(supabaseClient.calls[1][1], 'threads');
   assert.equal(supabaseClient.calls[1][2].title, 'Thread title');
   assert.equal(supabaseClient.calls[1][2].summary, 'Thread summary');
-  assert.equal(supabaseClient.calls[1][2].updated_at, null);
+  assert.equal(typeof supabaseClient.calls[1][2].updated_at, 'string');
+  assert.equal(supabaseClient.calls[1][2].vectors, null);
   assert.equal(supabaseClient.calls[1][2].current_position, 0);
   assert.equal(typeof supabaseClient.calls[1][2].created_at, 'string');
+  assert.equal(supabaseClient.calls[1][2].updated_at, supabaseClient.calls[1][2].created_at);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
+});
+
+test('insertThread passes through vectors when provided', async () => {
+  const supabaseClient = createInsertThreadClient({});
+
+  await insertThread({
+    supabaseClient,
+    payload: {
+      title: 'Thread title',
+      summary: 'Thread summary',
+      vectors: [0.1, 0.2, 0.3],
+    },
+  });
+
+  assert.deepEqual(supabaseClient.calls[1][2].vectors, [0.1, 0.2, 0.3]);
 });
 
 test('insertThread rejects missing title', async () => {

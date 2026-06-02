@@ -71,6 +71,7 @@ test('POST /threads inserts a thread and returns the new thread_id', async () =>
     body: {
       title: 'Thread title',
       summary: 'Thread summary',
+      vectors: [0.1, 0.2, 0.3],
     },
   });
 

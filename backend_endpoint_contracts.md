@@ -293,13 +293,16 @@ User inputs:
 ```json
 {
   "title": "string",
-  "summary": "string"
+  "summary": "string",
+  "updated_at": "ISO timestamp, optional",
+  "vectors": "array or null, optional"
 }
 ```
 
 Automatic inputs / server-managed values:
 - `created_at`: current server timestamp.
-- `updated_at`: `null`.
+- `updated_at`: current server timestamp when omitted, otherwise the provided timestamp.
+- `vectors`: `null` when omitted, otherwise the provided array.
 - `current_position`: `0`.
 
 Returns:

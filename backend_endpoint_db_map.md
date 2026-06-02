@@ -46,7 +46,8 @@ This file reflects the current backend implementation in `src/`.
     - `title`
     - `summary`
     - `created_at`
-    - `updated_at = null`
+    - `updated_at = now` by default
+    - `vectors = null` by default
     - `current_position = 0`
 - Fetches:
   - Insert return from `threads`: `thread_id`

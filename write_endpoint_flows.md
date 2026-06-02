@@ -84,12 +84,12 @@ DB read version_log
 { version_id }
 
 ## POST /threads
-(title, summary)
+(title, summary, vectors optional)
       ↓
 [sys: supabaseClient, trimmed, validated]
       ↓
 DB insert threads
-[auto: thread_id ↑, created_at = now, updated_at = null, current_position = 0]
+[auto: thread_id ↑, created_at = now, updated_at = now by default, vectors = null by default, current_position = 0]
       ↓
 { success: true, thread_id }
 
