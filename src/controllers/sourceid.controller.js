@@ -18,16 +18,16 @@ async function insertSourceid(request, response) {
     success: true,
   });
 }
-
 async function updateSourceid(request, response) {
-  await sourceidService.updateSourceid({
-    supabaseClient: resolveSupabaseClient(request),
-    payload: request.body,
-  });
-
-  response.json({
-    success: true,
-  });
+  try {
+    await sourceidService.updateSourceid({
+      supabaseClient: resolveSupabaseClient(request),
+      payload: request.body,
+    });
+    response.json({ success: true });
+  } catch (error) {
+    response.status(500).json({ error: error.message });
+  }
 }
 
 async function loadSourceids(request, response) {
