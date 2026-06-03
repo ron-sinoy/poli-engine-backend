@@ -15,7 +15,6 @@ async function updateSourceid({ supabaseClient, metadata }) {
     .eq('source_id', metadata.source_id)
     .select('source_id,status')
     .limit(1)
-    .maybeSingle();
 }
 
 module.exports = {

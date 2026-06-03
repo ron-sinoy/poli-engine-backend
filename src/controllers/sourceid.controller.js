@@ -26,7 +26,10 @@ async function updateSourceid(request, response) {
     });
     response.json({ success: true });
   } catch (error) {
-    response.status(500).json({ error: error.message });
+    response.status(error.statusCode || 500).json({ 
+      error: error.message,
+      details: error.details
+    });
   }
 }
 
