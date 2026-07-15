@@ -31,12 +31,24 @@ async function insertWaitingList(request, response) {
   });
 }
 
-async function loadVectorWaitingListIncidents(request, response) {
-  const incidents = await incidentService.loadWaitingListIncidentsVectors({
+async function matchWaitingListIncidents(request, response) {
+  const incidents = await incidentService.matchWaitingListIncidents({
     supabaseClient: resolveSupabaseClient(request),
+    payload: request.body,
   });
 
   response.json(incidents);
+}
+
+async function updateWaitingListStatus(request, response) {
+  await incidentService.updateWaitingListStatus({
+    supabaseClient: resolveSupabaseClient(request),
+    payload: request.body,
+  });
+
+  response.json({
+    success: true,
+  });
 }
 
 async function loadContentWaitingListIncidents(request, response) {
@@ -50,6 +62,7 @@ async function loadContentWaitingListIncidents(request, response) {
 module.exports = {
   insertIncident,
   insertWaitingList,
-  loadVectorWaitingListIncidents,
+  matchWaitingListIncidents,
+  updateWaitingListStatus,
   loadContentWaitingListIncidents,
 };

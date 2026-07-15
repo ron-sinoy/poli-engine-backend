@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.post('/threads', asyncHandler(threadController.insertThread));
+router.post('/threads/match', asyncHandler(threadController.matchThreads));
 router.get('/threadsList', asyncHandler(threadController.loadThreadsList));
 router.get('/threadsInternal', asyncHandler(threadController.loadThreadsInternal));
 router.get('/threads/:id', asyncHandler(threadController.getThreadById));

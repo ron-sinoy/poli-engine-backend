@@ -85,6 +85,32 @@ async function loadThreadsInternal({ supabaseClient }) {
   return data || [];
 }
 
+async function matchThreads({ supabaseClient, payload }) {
+  const queryVector = payload?.vectors;
+
+  if (!Array.isArray(queryVector)) {
+    throw new AppError(422, 'vectors must be an array');
+  }
+
+  const matchCount = payload?.match_count === undefined ? 3 : Number(payload.match_count);
+
+  if (!Number.isSafeInteger(matchCount) || matchCount < 1) {
+    throw new AppError(422, 'match_count must be an integer of at least 1');
+  }
+
+  const { data, error } = await threadRepository.matchThreads({
+    supabaseClient,
+    queryVector,
+    matchCount,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to match threads in Supabase', error);
+  }
+
+  return data || [];
+}
+
 async function insertThread({ supabaseClient, payload }) {
   const title = requireNonEmptyString(payload?.title, 'title');
   const summary = requireNonEmptyString(payload?.summary, 'summary');
@@ -271,4 +297,4 @@ async function getThreadById({ supabaseClient, threadId }) {
   };
 }
 
-module.exports = { loadThreadsList, loadThreadsInternal, insertThread, getThreadById };
+module.exports = { loadThreadsList, loadThreadsInternal, matchThreads, insertThread, getThreadById };

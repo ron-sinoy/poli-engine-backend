@@ -16,12 +16,19 @@ function createSourceidRouteClient({
     from() {
       return {
         select() {
-          return Promise.resolve({
-            data: sourceids,
-            error: loadError,
-          });
+          const result = { data: sourceids, error: loadError };
+
+          // Thenable so a bare select resolves, but still chainable for .in().
+          return {
+            in() {
+              return Promise.resolve(result);
+            },
+            then(onFulfilled, onRejected) {
+              return Promise.resolve(result).then(onFulfilled, onRejected);
+            },
+          };
         },
-        insert() {
+        upsert() {
           return Promise.resolve({
             data: null,
             error: insertError,
@@ -133,4 +140,20 @@ test('POST /sourceids/update updates source_id status and returns success', asyn
   assert.deepEqual(response.body, {
     success: true,
   });
+});
+
+test('POST /sourceids/exists returns only the rows for the requested ids', async () => {
+  const rows = [{ source_id: 'mt_#a', status: 'completed' }];
+  const app = createApp({
+    supabaseClient: createSourceidRouteClient({ sourceids: rows }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/sourceids/exists',
+    body: { source_ids: ['mt_#a', 'mt_#b'] },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, rows);
 });

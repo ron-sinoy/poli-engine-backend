@@ -52,6 +52,30 @@ async function loadSourceids({ supabaseClient }) {
   return data || [];
 }
 
+async function sourceidsExist({ supabaseClient, payload }) {
+  const sourceIds = payload?.source_ids;
+
+  if (!Array.isArray(sourceIds)) {
+    throw new AppError(422, 'source_ids must be an array');
+  }
+
+  if (sourceIds.length === 0) {
+    return [];
+  }
+
+  const validatedSourceIds = sourceIds.map((sourceId) => validateSourceId(sourceId));
+  const { data, error } = await sourceidRepository.loadSourceidsByIds({
+    supabaseClient,
+    sourceIds: validatedSourceIds,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to load source_ids from Supabase', error);
+  }
+
+  return data || [];
+}
+
 async function insertSourceid({ supabaseClient, payload }) {
   const metadata = validateSourceidPayload(payload);
   const { error } = await sourceidRepository.insertSourceid({
@@ -82,6 +106,7 @@ async function updateSourceid({ supabaseClient, payload }) {
 
 module.exports = {
   loadSourceids,
+  sourceidsExist,
   insertSourceid,
   updateSourceid,
 };

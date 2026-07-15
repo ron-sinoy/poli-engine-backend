@@ -8,16 +8,19 @@
 - `/threadsList`
 - `/threadsInternal`
 - `/threads/:id`
-- `/vector_waiting_list_incidents`
 - `/content_waiting-list_incidents`
 
 ## POST
 - `/threads`
+- `/threads/match`
 - `/quotes`
 - `/incidents`
 - `/waitinglists`
+- `/waitinglists/match`
+- `/waitinglists/update`
 - `/persons`
 - `/parties`
 - `/sourceids`
+- `/sourceids/exists`
 - `/sourceids/update`
 - `/version/update`

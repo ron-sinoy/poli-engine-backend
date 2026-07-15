@@ -7,6 +7,9 @@ const { invokeApp } = require('../test_utils/invokeApp');
 
 function createThreadsClient({ data, error = null }) {
   return {
+    rpc() {
+      return Promise.resolve({ data, error });
+    },
     from() {
       return {
         select() {
@@ -211,4 +214,34 @@ test('GET /threads/:id returns 404 when thread is missing', async () => {
 
   assert.equal(response.statusCode, 404);
   assert.deepEqual(response.body, { error: 'Thread not found' });
+});
+
+test('POST /threads/match returns threads ranked by cosine similarity', async () => {
+  const matches = [
+    { thread_id: 986, title: 'Alpha', summary: 'Alpha summary', score: 0.93 },
+    { thread_id: 987, title: 'Beta', summary: 'Beta summary', score: 0.81 },
+  ];
+  const app = createApp({ supabaseClient: createThreadsClient({ data: matches }) });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/threads/match',
+    body: { vectors: [0.1, 0.2], match_count: 2 },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, matches);
+});
+
+test('POST /threads/match rejects a missing query vector', async () => {
+  const app = createApp({ supabaseClient: createThreadsClient({ data: [] }) });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/threads/match',
+    body: { match_count: 3 },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.body, { error: 'vectors must be an array' });
 });

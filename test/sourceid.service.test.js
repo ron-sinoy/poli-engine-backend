@@ -6,6 +6,7 @@ const { AppError } = require('../src/errors/AppError');
 const {
   insertSourceid,
   loadSourceids,
+  sourceidsExist,
   updateSourceid,
 } = require('../src/services/sourceid.service');
 
@@ -27,13 +28,21 @@ function createSourceidClient({
         select(columns) {
           calls.push(['select', tableName, columns]);
 
-          return Promise.resolve({
-            data: sourceids,
-            error: loadError,
-          });
+          const result = { data: sourceids, error: loadError };
+
+          // Thenable so a bare select resolves, but still chainable for .in().
+          return {
+            in(column, values) {
+              calls.push(['in', tableName, column, values]);
+              return Promise.resolve(result);
+            },
+            then(onFulfilled, onRejected) {
+              return Promise.resolve(result).then(onFulfilled, onRejected);
+            },
+          };
         },
-        insert(payload) {
-          calls.push(['insert', tableName, payload]);
+        upsert(payload, options) {
+          calls.push(['upsert', tableName, payload, options]);
 
           return Promise.resolve({
             data: null,
@@ -109,7 +118,7 @@ test('loadSourceids maps Supabase read failures to AppError', async () => {
   );
 });
 
-test('insertSourceid inserts source_id and status into pipeline_metadata without updating version_id', async () => {
+test('insertSourceid upserts so a re-run cannot add a second row for the same id', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
@@ -122,12 +131,12 @@ test('insertSourceid inserts source_id and status into pipeline_metadata without
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['insert', 'pipeline_metadata', { source_id: 17, status: 'pending' }],
+    ['upsert', 'pipeline_metadata', { source_id: 17, status: 'pending' }, { onConflict: 'source_id', ignoreDuplicates: true }],
   ]);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
-test('insertSourceid trims and inserts string source_id and status values', async () => {
+test('insertSourceid trims and upserts string source_id and status values', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
@@ -140,7 +149,7 @@ test('insertSourceid trims and inserts string source_id and status values', asyn
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['insert', 'pipeline_metadata', { source_id: 'abc-123', status: 'complete' }],
+    ['upsert', 'pipeline_metadata', { source_id: 'abc-123', status: 'complete' }, { onConflict: 'source_id', ignoreDuplicates: true }],
   ]);
 });
 
@@ -290,5 +299,41 @@ test('updateSourceid maps Supabase update failures to AppError', async () => {
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('sourceidsExist looks up only the requested ids instead of reading the table', async () => {
+  const rows = [{ source_id: 'mt_#a', status: 'completed' }];
+  const supabaseClient = createSourceidClient({ sourceids: rows });
+
+  const result = await sourceidsExist({
+    supabaseClient,
+    payload: { source_ids: ['mt_#a', 'mt_#b'] },
+  });
+
+  assert.deepEqual(result, rows);
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'pipeline_metadata'],
+    ['select', 'pipeline_metadata', 'source_id,status'],
+    ['in', 'pipeline_metadata', 'source_id', ['mt_#a', 'mt_#b']],
+  ]);
+});
+
+test('sourceidsExist short-circuits an empty batch without touching Supabase', async () => {
+  const supabaseClient = createSourceidClient({});
+
+  const result = await sourceidsExist({ supabaseClient, payload: { source_ids: [] } });
+
+  assert.deepEqual(result, []);
+  assert.deepEqual(supabaseClient.calls, []);
+});
+
+test('sourceidsExist rejects a non-array payload', async () => {
+  const supabaseClient = createSourceidClient({});
+
+  await assert.rejects(
+    () => sourceidsExist({ supabaseClient, payload: { source_ids: 'mt_#a' } }),
+    (error) =>
+      error instanceof AppError && error.statusCode === 422 && error.message === 'source_ids must be an array'
   );
 });

@@ -39,6 +39,20 @@ This file reflects the current backend implementation in `src/`.
 - Response shaping notes:
   - Returns `version_id`, `persons[].person_id`, `persons[].name`, `persons[].party_id`, `persons[].party`, `persons[].party_name`, `persons[].alliance_id`, `persons[].alliance`, `persons[].alliance_name`, `parties[].party_id`, `parties[].alliance_id`, `parties[].name`, `parties[].abbreviation`, `alliances[].alliance_id`, `alliances[].name`, and `alliances[].abbreviation`
 
+## POST /threads/match
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - Calls the `match_threads(query_vector, match_count)` function, which reads
+    `threads`: `thread_id`, `title`, `summary`, `vectors`
+- Response shaping notes:
+  - Returns `thread_id`, `title`, `summary`, `score`
+  - `vectors` is read for ranking but never returned
+  - Threads with a null `vectors` are excluded
+- Additional notes:
+  - `score` is cosine similarity, `1 - (vectors <=> query_vector)`
+
 ## POST /threads
 
 - Inserts/updates:
@@ -198,27 +212,44 @@ This file reflects the current backend implementation in `src/`.
   - No read is performed against `persons` to validate `persons_involved`
   - Returns `{ success: true, entry_id }`
 
-## GET /vector_waiting_list_incidents
+## POST /waitinglists/match
 
 - Inserts/updates:
   - None
 - Fetches:
-  - `waiting_list_incidents`: `id`, `vectors`
-- Not fetched from tables already queried:
-  - `waiting_list_incidents`: `content`
+  - Calls the `match_waiting_list_incidents(query_vector, match_count)` function,
+    which reads `waiting_list_incidents`: `id`, `content`, `source_url`,
+    `source_id`, `vectors`
 - Response shaping notes:
-  - Returns rows exactly as stored for `id` and `vectors`
+  - Returns `id`, `content`, `source_url`, `source_id`, `score`
+  - `vectors` is read for ranking but never returned
+  - Excludes rows with a null `vectors`, a null `source_url`, or a `status` other
+    than `waiting`
+- Additional notes:
+  - Ranking happens in Postgres via `vectors <=> query_vector`
+  - Replaces `GET /vector_waiting_list_incidents`, which selected every row's
+    3072-dim vector and hit the Supabase statement timeout (57014)
+
+## POST /waitinglists/update
+
+- Inserts/updates:
+  - `waiting_list_incidents` update:
+    - `status`
+- Fetches:
+  - Updated `waiting_list_incidents` return: `id`, `status`
+- Additional notes:
+  - The update is filtered by `id`, not `source_id`
+  - Returns 404 when no row matches
+  - This endpoint does not update `version_log`
 
 ## GET /content_waiting-list_incidents
 
 - Inserts/updates:
   - None
 - Fetches:
-  - `waiting_list_incidents`: `id`, `content`
+  - `waiting_list_incidents`: `id`, `content`, `source_url`, `source_id`
 - Not fetched from tables already queried:
-  - `waiting_list_incidents`: `vectors`
-- Response shaping notes:
-  - Returns rows exactly as stored for `id` and `content`
+  - `waiting_list_incidents`: `vectors`, `status`, `created_at`
 
 ## POST /waitinglists
 
@@ -226,6 +257,8 @@ This file reflects the current backend implementation in `src/`.
   - `waiting_list_incidents` insert:
     - `content`
     - `vectors`
+    - `source_url`
+    - `source_id`
 - Fetches:
   - None
 - Not fetched/read back from tables already touched:
@@ -233,6 +266,9 @@ This file reflects the current backend implementation in `src/`.
 - Additional notes:
   - `content` is a required text body field
   - `vectors` is a required array body field
+  - `source_url` and `source_id` are required text body fields; without them the
+    row could never be promoted into an incident
+  - `status` defaults to `waiting`
   - This endpoint does not update `version_log`
 
 ## POST /parties
@@ -262,11 +298,25 @@ This file reflects the current backend implementation in `src/`.
   - `pipeline_metadata`: `source_id`, `status`
 - Not fetched from table already queried:
   - `pipeline_metadata`: no other columns are selected
+- Additional notes:
+  - PostgREST caps this at 1000 rows. Use `POST /sourceids/exists` to test
+    specific ids instead of scanning this response.
+
+## POST /sourceids/exists
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `pipeline_metadata`: `source_id`, `status`, filtered to the requested ids
+- Additional notes:
+  - `source_ids` is a required array body field
+  - An empty array short-circuits and returns `[]` without querying
+  - Not subject to the 1000-row cap on `GET /sourceids`
 
 ## POST /sourceids
 
 - Inserts/updates:
-  - `pipeline_metadata` insert:
+  - `pipeline_metadata` upsert on `source_id` (ignores duplicates):
     - `source_id`
     - `status`
 - Fetches:

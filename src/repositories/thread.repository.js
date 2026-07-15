@@ -21,6 +21,15 @@ async function loadThreadsInternal({ supabaseClient }) {
     .order('updated_at', { ascending: false });
 }
 
+// Ranks in Postgres and returns only the top matches, so thread vectors never
+// cross the wire. Threads without a vector are skipped by the RPC.
+async function matchThreads({ supabaseClient, queryVector, matchCount }) {
+  return supabaseClient.rpc('match_threads', {
+    query_vector: queryVector,
+    match_count: matchCount,
+  });
+}
+
 async function insertThread({ supabaseClient, thread }) {
   return supabaseClient
     .from(THREADS_TABLE)
@@ -113,6 +122,7 @@ async function loadAlliancesByIds({ supabaseClient, allianceIds }) {
 module.exports = {
   loadThreadsList,
   loadThreadsInternal,
+  matchThreads,
   insertThread,
   getThreadById,
   getThreadProgressById,

@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.get('/sourceids', asyncHandler(sourceidController.loadSourceids));
+router.post('/sourceids/exists', asyncHandler(sourceidController.sourceidsExist));
 router.post('/sourceids', asyncHandler(sourceidController.insertSourceid));
 router.post('/sourceids/update', asyncHandler(sourceidController.updateSourceid));
 

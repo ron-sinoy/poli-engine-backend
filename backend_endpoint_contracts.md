@@ -398,13 +398,19 @@ Notes:
 - The service does not pre-check that `persons_involved` person ids exist.
 - This endpoint currently does not bump `version_log`.
 
-## GET /vector_waiting_list_incidents
+## POST /waitinglists/match
 
 Purpose:
-- Loads waiting list incidents with `id` and `vectors`.
+- Returns the waiting list incidents most similar to a query vector.
 
 User inputs:
-- None.
+
+```json
+{
+  "vectors": [0.1, 0.2],
+  "match_count": 3
+}
+```
 
 Returns:
 
@@ -412,14 +418,52 @@ Returns:
 [
   {
     "id": 1,
-    "vectors": "array or null"
+    "content": "string or null",
+    "source_url": "string or null",
+    "source_id": "string or null",
+    "score": 0.91
   }
 ]
 ```
 
 Notes:
-- Reads from `waiting_list_incidents`.
-- Returns rows exactly as stored for `id` and `vectors`.
+- Calls the `match_waiting_list_incidents` Postgres function; ranking happens in
+  the database and no vector is returned.
+- `score` is cosine similarity, `1 - (vectors <=> query_vector)`.
+- `match_count` defaults to 3 and must be at least 1.
+- Rows with no `source_url` are excluded: they can never be promoted into an
+  incident, so they are not match candidates.
+- Only rows with `status = 'waiting'` are considered.
+- Replaces `GET /vector_waiting_list_incidents`, which returned every row's
+  3072-dim vector and exceeded the Supabase statement timeout.
+
+## POST /waitinglists/update
+
+Purpose:
+- Sets the `status` of one `waiting_list_incidents` row.
+
+User inputs:
+
+```json
+{
+  "id": 1,
+  "status": "completed"
+}
+```
+
+Returns:
+
+```json
+{
+  "success": true
+}
+```
+
+Notes:
+- `id` is the `waiting_list_incidents.id`, not a `source_id`.
+- Returns 404 if no row has that id.
+- Used to retire a row once it has been promoted into a thread, so it cannot
+  spawn the same thread again.
 
 ## GET /content_waiting-list_incidents
 
@@ -435,14 +479,17 @@ Returns:
 [
   {
     "id": 1,
-    "content": "string or null"
+    "content": "string or null",
+    "source_url": "string or null",
+    "source_id": "string or null"
   }
 ]
 ```
 
 Notes:
 - Reads from `waiting_list_incidents`.
-- Returns rows exactly as stored for `id` and `content`.
+- Legacy rows created before `source_url` existed return null for it and for
+  `source_id`; they cannot be promoted into a thread.
 
 ## POST /waitinglists
 
@@ -454,7 +501,9 @@ User inputs:
 ```json
 {
   "content": "string",
-  "vectors": [0.1, 0.2]
+  "vectors": [0.1, 0.2],
+  "source_url": "string",
+  "source_id": "string"
 }
 ```
 

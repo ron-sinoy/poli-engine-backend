@@ -7,7 +7,8 @@ const {
   insertIncident,
   insertWaitingList,
   loadWaitingListIncidentsContent,
-  loadWaitingListIncidentsVectors,
+  matchWaitingListIncidents,
+  updateWaitingListStatus,
 } = require('../src/services/incident.service');
 
 function createIncidentClient({
@@ -98,17 +99,38 @@ function createWaitingListIncidentClient({ data = [], error = null } = {}) {
 
   return {
     calls,
+    rpc(functionName, args) {
+      calls.push(['rpc', functionName, args]);
+      return Promise.resolve({ data, error });
+    },
     from(tableName) {
       calls.push(['from', tableName]);
 
       return {
         select(columns) {
           calls.push(['select', tableName, columns]);
-          return Promise.resolve({ data, error });
+          return this.wasUpdated ? this : Promise.resolve({ data, error });
         },
         insert(payload) {
           calls.push(['insert', tableName, payload]);
           return Promise.resolve({ data: null, error });
+        },
+        update(payload) {
+          this.wasUpdated = true;
+          calls.push(['update', tableName, payload]);
+          return this;
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return this;
+        },
+        limit(count) {
+          calls.push(['limit', tableName, count]);
+          return this;
+        },
+        maybeSingle() {
+          calls.push(['maybeSingle', tableName]);
+          return Promise.resolve({ data: error ? null : data, error });
         },
       };
     },
@@ -230,26 +252,82 @@ test('insertIncident maps incident insert failures to AppError', async () => {
   );
 });
 
-test('loadWaitingListIncidentsVectors reads id and vectors rows from waiting_list_incidents', async () => {
+test('matchWaitingListIncidents ranks in Postgres instead of reading every vector', async () => {
   const incidents = [
-    { id: 1, vectors: [0.1, 0.2] },
-    { id: 2, vectors: [0.3, 0.4] },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0.91 },
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 0.87 },
   ];
   const supabaseClient = createWaitingListIncidentClient({ data: incidents });
 
-  const result = await loadWaitingListIncidentsVectors({ supabaseClient });
+  const result = await matchWaitingListIncidents({
+    supabaseClient,
+    payload: { vectors: [0.1, 0.2], match_count: 2 },
+  });
 
   assert.deepEqual(result, incidents);
   assert.deepEqual(supabaseClient.calls, [
-    ['from', 'waiting_list_incidents'],
-    ['select', 'waiting_list_incidents', 'id,vectors'],
+    ['rpc', 'match_waiting_list_incidents', { query_vector: [0.1, 0.2], match_count: 2 }],
+  ]);
+  // The whole point of the RPC: no table read, so no 3072-dim payload.
+  assert.ok(!supabaseClient.calls.some((call) => call[0] === 'from'));
+});
+
+test('matchWaitingListIncidents defaults match_count to 3', async () => {
+  const supabaseClient = createWaitingListIncidentClient({ data: [] });
+
+  await matchWaitingListIncidents({ supabaseClient, payload: { vectors: [0.1, 0.2] } });
+
+  assert.deepEqual(supabaseClient.calls, [
+    ['rpc', 'match_waiting_list_incidents', { query_vector: [0.1, 0.2], match_count: 3 }],
   ]);
 });
 
-test('loadWaitingListIncidentsContent reads id and content rows from waiting_list_incidents', async () => {
+test('matchWaitingListIncidents rejects a missing query vector', async () => {
+  const supabaseClient = createWaitingListIncidentClient({ data: [] });
+
+  await assert.rejects(
+    () => matchWaitingListIncidents({ supabaseClient, payload: { match_count: 3 } }),
+    (error) => error instanceof AppError && error.statusCode === 422 && error.message === 'vectors is required'
+  );
+});
+
+test('matchWaitingListIncidents maps Supabase rpc failures to AppError', async () => {
+  const supabaseClient = createWaitingListIncidentClient({ error: { message: 'rpc failed' } });
+
+  await assert.rejects(
+    () => matchWaitingListIncidents({ supabaseClient, payload: { vectors: [0.1, 0.2] } }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('updateWaitingListStatus marks a consumed row so it cannot spawn the same thread again', async () => {
+  const supabaseClient = createWaitingListIncidentClient({ data: { id: 5, status: 'completed' } });
+
+  await updateWaitingListStatus({ supabaseClient, payload: { id: 5, status: 'completed' } });
+
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'waiting_list_incidents'],
+    ['update', 'waiting_list_incidents', { status: 'completed' }],
+    ['eq', 'waiting_list_incidents', 'id', 5],
+    ['select', 'waiting_list_incidents', 'id,status'],
+    ['limit', 'waiting_list_incidents', 1],
+    ['maybeSingle', 'waiting_list_incidents'],
+  ]);
+});
+
+test('updateWaitingListStatus returns not found for an unknown id', async () => {
+  const supabaseClient = createWaitingListIncidentClient({ data: null });
+
+  await assert.rejects(
+    () => updateWaitingListStatus({ supabaseClient, payload: { id: 404, status: 'completed' } }),
+    (error) => error instanceof AppError && error.statusCode === 404
+  );
+});
+
+test('loadWaitingListIncidentsContent returns source_url so a row can be promoted to an incident', async () => {
   const incidents = [
-    { id: 1, content: 'Alpha' },
-    { id: 2, content: 'Beta' },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a' },
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b' },
   ];
   const supabaseClient = createWaitingListIncidentClient({ data: incidents });
 
@@ -258,19 +336,8 @@ test('loadWaitingListIncidentsContent reads id and content rows from waiting_lis
   assert.deepEqual(result, incidents);
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'waiting_list_incidents'],
-    ['select', 'waiting_list_incidents', 'id,content'],
+    ['select', 'waiting_list_incidents', 'id,content,source_url,source_id'],
   ]);
-});
-
-test('loadWaitingListIncidentsVectors maps Supabase read failures to AppError', async () => {
-  const supabaseClient = createWaitingListIncidentClient({
-    error: { message: 'read failed' },
-  });
-
-  await assert.rejects(
-    () => loadWaitingListIncidentsVectors({ supabaseClient }),
-    (error) => error instanceof AppError && error.statusCode === 502
-  );
 });
 
 test('loadWaitingListIncidentsContent maps Supabase read failures to AppError', async () => {
@@ -284,7 +351,7 @@ test('loadWaitingListIncidentsContent maps Supabase read failures to AppError', 
   );
 });
 
-test('insertWaitingList writes content and vectors to waiting_list_incidents without updating version_log', async () => {
+test('insertWaitingList persists source_url and source_id alongside content and vectors', async () => {
   const supabaseClient = createWaitingListIncidentClient();
 
   await insertWaitingList({
@@ -292,14 +359,45 @@ test('insertWaitingList writes content and vectors to waiting_list_incidents wit
     payload: {
       content: 'Alpha',
       vectors: [0.1, 0.2],
+      source_url: 'https://example.com/alpha',
+      source_id: 'mt_#alpha',
     },
   });
 
+  // Dropping source_url here is what produced threads holding a single
+  // incident: the row could never be posted back as an incident.
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'waiting_list_incidents'],
-    ['insert', 'waiting_list_incidents', { content: 'Alpha', vectors: [0.1, 0.2] }],
+    [
+      'insert',
+      'waiting_list_incidents',
+      {
+        content: 'Alpha',
+        vectors: [0.1, 0.2],
+        source_url: 'https://example.com/alpha',
+        source_id: 'mt_#alpha',
+      },
+    ],
   ]);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
+});
+
+test('insertWaitingList rejects a row with no source_url', async () => {
+  const supabaseClient = createWaitingListIncidentClient();
+
+  await assert.rejects(
+    () =>
+      insertWaitingList({
+        supabaseClient,
+        payload: {
+          content: 'Alpha',
+          vectors: [0.1, 0.2],
+          source_id: 'mt_#alpha',
+        },
+      }),
+    (error) =>
+      error instanceof AppError && error.statusCode === 422 && error.message === 'source_url is required'
+  );
 });
 
 test('insertWaitingList rejects missing content', async () => {
@@ -311,6 +409,8 @@ test('insertWaitingList rejects missing content', async () => {
         supabaseClient,
         payload: {
           vectors: [0.1, 0.2],
+          source_url: 'https://example.com/alpha',
+          source_id: 'mt_#alpha',
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 422 && error.message === 'content is required'
@@ -326,6 +426,8 @@ test('insertWaitingList rejects missing vectors', async () => {
         supabaseClient,
         payload: {
           content: 'Alpha',
+          source_url: 'https://example.com/alpha',
+          source_id: 'mt_#alpha',
         },
       }),
     (error) =>
@@ -345,6 +447,8 @@ test('insertWaitingList maps Supabase insert failures to AppError', async () => 
         payload: {
           content: 'Alpha',
           vectors: [0.1, 0.2],
+          source_url: 'https://example.com/alpha',
+          source_id: 'mt_#alpha',
         },
       }),
     (error) => error instanceof AppError && error.statusCode === 502

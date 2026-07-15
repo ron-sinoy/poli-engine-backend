@@ -8,10 +8,8 @@ const router = express.Router();
 
 router.post('/incidents', asyncHandler(incidentController.insertIncident));
 router.post('/waitinglists', asyncHandler(incidentController.insertWaitingList));
-router.get(
-  '/vector_waiting_list_incidents',
-  asyncHandler(incidentController.loadVectorWaitingListIncidents)
-);
+router.post('/waitinglists/match', asyncHandler(incidentController.matchWaitingListIncidents));
+router.post('/waitinglists/update', asyncHandler(incidentController.updateWaitingListStatus));
 router.get(
   '/content_waiting-list_incidents',
   asyncHandler(incidentController.loadContentWaitingListIncidents)

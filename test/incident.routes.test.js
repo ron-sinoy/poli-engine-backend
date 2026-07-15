@@ -12,12 +12,16 @@ function createIncidentRouteClient({
   waitingListInsertError = null,
 }) {
   return {
+    rpc() {
+      return Promise.resolve({ data: waitingListIncidents, error: waitingListError });
+    },
     from(tableName) {
       return {
         tableName,
         wasUpdated: false,
         select() {
-          if (tableName === 'waiting_list_incidents') {
+          // An update chain keeps building; a bare read resolves immediately.
+          if (tableName === 'waiting_list_incidents' && !this.wasUpdated) {
             return Promise.resolve({
               data: waitingListIncidents,
               error: waitingListError,
@@ -58,6 +62,13 @@ function createIncidentRouteClient({
             return {
               data: { entry_id: entryId },
               error: null,
+            };
+          }
+
+          if (tableName === 'waiting_list_incidents') {
+            return {
+              data: waitingListIncidents,
+              error: waitingListError,
             };
           }
 
@@ -116,28 +127,46 @@ test('POST /incidents returns validation errors for invalid payloads', async () 
   });
 });
 
-test('GET /vector_waiting_list_incidents returns waiting list incident vectors', async () => {
+test('POST /waitinglists/match returns the ranked waiting list incidents', async () => {
   const waitingListIncidents = [
-    { id: 1, vectors: [0.1, 0.2] },
-    { id: 2, vectors: [0.3, 0.4] },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0.91 },
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 0.87 },
   ];
   const app = createApp({
     supabaseClient: createIncidentRouteClient({ waitingListIncidents }),
   });
 
   const response = await invokeApp(app, {
-    method: 'GET',
-    url: '/vector_waiting_list_incidents',
+    method: 'POST',
+    url: '/waitinglists/match',
+    body: { vectors: [0.1, 0.2], match_count: 2 },
   });
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body, waitingListIncidents);
 });
 
+test('POST /waitinglists/update marks a waiting list row consumed', async () => {
+  const app = createApp({
+    supabaseClient: createIncidentRouteClient({
+      waitingListIncidents: { id: 5, status: 'completed' },
+    }),
+  });
+
+  const response = await invokeApp(app, {
+    method: 'POST',
+    url: '/waitinglists/update',
+    body: { id: 5, status: 'completed' },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, { success: true });
+});
+
 test('GET /content_waiting-list_incidents returns waiting list incident content', async () => {
   const waitingListIncidents = [
-    { id: 1, content: 'Alpha' },
-    { id: 2, content: 'Beta' },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a' },
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b' },
   ];
   const app = createApp({
     supabaseClient: createIncidentRouteClient({ waitingListIncidents }),
@@ -163,6 +192,8 @@ test('POST /waitinglists inserts a waiting list row and returns success', async 
     body: {
       content: 'Alpha',
       vectors: [0.1, 0.2],
+      source_url: 'https://example.com/alpha',
+      source_id: 'mt_#alpha',
     },
   });
 
@@ -182,6 +213,8 @@ test('POST /waitinglists returns validation errors for missing content', async (
     url: '/waitinglists',
     body: {
       vectors: [0.1, 0.2],
+      source_url: 'https://example.com/alpha',
+      source_id: 'mt_#alpha',
     },
   });
 
@@ -201,6 +234,8 @@ test('POST /waitinglists returns validation errors for missing vectors', async (
     url: '/waitinglists',
     body: {
       content: 'Alpha',
+      source_url: 'https://example.com/alpha',
+      source_id: 'mt_#alpha',
     },
   });
 

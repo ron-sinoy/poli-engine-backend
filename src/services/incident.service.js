@@ -55,6 +55,30 @@ function validateInsertWaitingListPayload(payload = {}) {
   return {
     content: requireNonEmptyString(payload.content, 'content'),
     vectors: validateVectors(payload.vectors),
+    // Required: a row that cannot produce a source_url can never be promoted
+    // into an incident, because POST /incidents rejects it.
+    source_url: requireNonEmptyString(payload.source_url, 'source_url'),
+    source_id: requireNonEmptyString(payload.source_id, 'source_id'),
+  };
+}
+
+function validateMatchPayload(payload = {}) {
+  const matchCount = payload.match_count === undefined ? 3 : requireInteger(payload.match_count, 'match_count');
+
+  if (matchCount < 1) {
+    throw new AppError(422, 'match_count must be at least 1');
+  }
+
+  return {
+    queryVector: validateVectors(payload.vectors),
+    matchCount,
+  };
+}
+
+function validateUpdateWaitingListPayload(payload = {}) {
+  return {
+    id: requireInteger(payload.id, 'id'),
+    status: requireNonEmptyString(payload.status, 'status'),
   };
 }
 
@@ -75,16 +99,36 @@ async function loadThreadProgressOrFail({ supabaseClient, threadId }) {
   return data;
 }
 
-async function loadWaitingListIncidentsVectors({ supabaseClient }) {
-  const { data, error } = await incidentRepository.loadWaitingListIncidentsVectors({
+async function matchWaitingListIncidents({ supabaseClient, payload }) {
+  const { queryVector, matchCount } = validateMatchPayload(payload);
+  const { data, error } = await incidentRepository.matchWaitingListIncidents({
     supabaseClient,
+    queryVector,
+    matchCount,
   });
 
   if (error) {
-    throw new AppError(502, 'Failed to load waiting list incident vectors from Supabase', error);
+    throw new AppError(502, 'Failed to match waiting list incidents in Supabase', error);
   }
 
   return data || [];
+}
+
+async function updateWaitingListStatus({ supabaseClient, payload }) {
+  const { id, status } = validateUpdateWaitingListPayload(payload);
+  const { data, error } = await incidentRepository.updateWaitingListStatus({
+    supabaseClient,
+    id,
+    status,
+  });
+
+  if (error) {
+    throw new AppError(502, 'Failed to update waiting list status in Supabase', error);
+  }
+
+  if (!data) {
+    throw new AppError(404, 'Waiting list incident was not found');
+  }
 }
 
 async function loadWaitingListIncidentsContent({ supabaseClient }) {
@@ -183,8 +227,9 @@ async function insertWaitingList({ supabaseClient, payload }) {
 }
 
 module.exports = {
-  loadWaitingListIncidentsVectors,
+  matchWaitingListIncidents,
   loadWaitingListIncidentsContent,
+  updateWaitingListStatus,
   insertIncident,
   insertWaitingList,
 };
