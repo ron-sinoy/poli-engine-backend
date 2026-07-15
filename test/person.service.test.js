@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { AppError } = require('../src/errors/AppError');
-const { insertPerson } = require('../src/services/person.service');
+const { insertPerson, getTrendingPoliticians } = require('../src/services/person.service');
 
 function createPersonClient({
   politicianId = 21,
@@ -204,6 +204,109 @@ test('insertPerson surfaces version update failures after a successful insert', 
         },
         versionService: delegatedVersionService(),
       }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+// --- trending politicians -------------------------------------------------
+
+function createTrendingClient({ windows = {}, error = null }) {
+  const calls = [];
+
+  return {
+    calls,
+    rpc(functionName, args) {
+      calls.push([functionName, args.since, args.match_count]);
+
+      if (error) {
+        return Promise.resolve({ data: null, error });
+      }
+
+      // Pick the canned result by how wide the requested window is.
+      const ageDays = Math.round((Date.now() - Date.parse(args.since)) / 86400000);
+      const key = ageDays <= 8 ? 'week' : ageDays <= 31 ? 'month' : 'all';
+      return Promise.resolve({ data: windows[key] || [], error: null });
+    },
+  };
+}
+
+const ROW_A = {
+  person_id: 2,
+  name: 'V D Satheesan',
+  photo_url: 'https://example.com/a.jpg',
+  party_abbr: 'INC',
+  alliance_abbr: 'UDF',
+  alliance_color: '#3990e6',
+  appearances: 12,
+};
+const ROW_B = {
+  person_id: 1,
+  name: 'Pinarayi Vijayan',
+  photo_url: null,
+  party_abbr: 'CPI(M)',
+  alliance_abbr: 'LDF',
+  alliance_color: '#E63946',
+  appearances: 4,
+};
+
+test('getTrendingPoliticians uses the 7-day window when it has enough people', async () => {
+  const supabaseClient = createTrendingClient({ windows: { week: [ROW_A, ROW_B] } });
+
+  const result = await getTrendingPoliticians({ supabaseClient });
+
+  assert.equal(result.length, 2);
+  assert.equal(supabaseClient.calls.length, 1, 'must not widen when the week suffices');
+  assert.deepEqual(result[0], {
+    person_id: 2,
+    name: 'V D Satheesan',
+    photo_url: 'https://example.com/a.jpg',
+    party: 'INC',
+    alliance: 'UDF',
+    alliance_color: '#3990e6',
+    score: 160, // 100 + 12 * 5
+  });
+  assert.equal(result[1].score, 120); // 100 + 4 * 5
+  assert.equal(result[1].photo_url, null);
+});
+
+test('getTrendingPoliticians never exposes the raw appearance count', async () => {
+  const supabaseClient = createTrendingClient({ windows: { week: [ROW_A, ROW_B] } });
+
+  const result = await getTrendingPoliticians({ supabaseClient });
+
+  for (const politician of result) {
+    assert.ok(!('appearances' in politician), 'appearances must not reach the client');
+    assert.ok(politician.score >= 100, 'score starts at 100');
+  }
+});
+
+test('getTrendingPoliticians widens the window until two people are found', async () => {
+  const supabaseClient = createTrendingClient({
+    windows: { week: [ROW_A], month: [], all: [ROW_A, ROW_B] },
+  });
+
+  const result = await getTrendingPoliticians({ supabaseClient });
+
+  assert.equal(result.length, 2);
+  assert.equal(supabaseClient.calls.length, 3, 'tries 7d, then 30d, then all-time');
+  assert.deepEqual(supabaseClient.calls.map((c) => c[0]), [
+    'trending_politicians',
+    'trending_politicians',
+    'trending_politicians',
+  ]);
+});
+
+test('getTrendingPoliticians returns nothing when fewer than two have ever appeared', async () => {
+  const supabaseClient = createTrendingClient({ windows: { week: [ROW_A], all: [ROW_A] } });
+
+  assert.deepEqual(await getTrendingPoliticians({ supabaseClient }), []);
+});
+
+test('getTrendingPoliticians maps rpc failures to AppError', async () => {
+  const supabaseClient = createTrendingClient({ error: { message: 'rpc failed' } });
+
+  await assert.rejects(
+    () => getTrendingPoliticians({ supabaseClient }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

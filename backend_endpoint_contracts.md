@@ -521,6 +521,39 @@ Notes:
 - `vectors` must be an array.
 - This endpoint currently does not bump `version_log`.
 
+## GET /politicians/trending
+
+Purpose:
+- Returns the two politicians appearing most often in recent incidents.
+
+User inputs:
+- None.
+
+Returns:
+
+```json
+[
+  {
+    "person_id": 2,
+    "name": "V D Satheesan",
+    "photo_url": "string or null",
+    "party": "INC",
+    "alliance": "UDF",
+    "alliance_color": "#3990e6",
+    "score": 160
+  }
+]
+```
+
+Notes:
+- Ranking runs in Postgres via `trending_politicians`.
+- `score` is a presentation index (`100 + appearances * 5`), not an approval,
+  popularity or support rating. The raw appearance count is never returned.
+- The window widens until two people are found: 7 days, then 30 days, then all
+  time.
+- Returns `[]` when fewer than two people qualify; the client hides the section.
+- Reads `incident_persons`, populated by the pipeline's person-extraction step.
+
 ## POST /persons
 
 Purpose:

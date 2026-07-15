@@ -121,6 +121,27 @@ This file reflects the current backend implementation in `src/`.
     - `alliance.color`
   - Helper ids such as `speaker_id`, `politician_id`, `party_id`, and `alliance_id` are not returned
 
+## GET /politicians/trending
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - Calls the `trending_politicians(since, match_count)` function, which reads
+    `incident_persons`, `timeline_entries` (`published_at`), `persons`
+    (`person_id`, `name`, `photo_url`), `politicians`, `parties`
+    (`abbreviation`), `alliances` (`abbreviation`, `color`)
+- Response shaping notes:
+  - Returns `person_id`, `name`, `photo_url`, `party`, `alliance`,
+    `alliance_color`, `score`
+  - The underlying appearance count is **not** returned. `score` is a display
+    index (`100 + appearances * 5`) computed in the service.
+  - Returns `[]` when fewer than two people qualify
+- Additional notes:
+  - The service widens the window until it finds two people: 7 days, then 30
+    days, then all time
+  - Depends on `incident_persons`, which the pipeline's person-extraction step
+    populates on both routing paths
+
 ## POST /persons
 
 - Inserts/updates:

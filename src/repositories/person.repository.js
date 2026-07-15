@@ -18,7 +18,17 @@ async function insertPerson({ supabaseClient, person }) {
     .maybeSingle();
 }
 
+// Ranks in Postgres so the appearance counts stay server-side; the service
+// turns them into a display score before anything reaches a client.
+async function trendingPoliticians({ supabaseClient, since, matchCount }) {
+  return supabaseClient.rpc('trending_politicians', {
+    since,
+    match_count: matchCount,
+  });
+}
+
 module.exports = {
   insertPolitician,
   insertPerson,
+  trendingPoliticians,
 };

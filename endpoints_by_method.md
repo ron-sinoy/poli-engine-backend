@@ -9,6 +9,7 @@
 - `/threadsInternal`
 - `/threads/:id`
 - `/content_waiting-list_incidents`
+- `/politicians/trending`
 
 ## POST
 - `/threads`

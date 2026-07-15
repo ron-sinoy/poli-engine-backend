@@ -22,6 +22,15 @@ async function insertPerson(request, response) {
   });
 }
 
+async function getTrendingPoliticians(request, response) {
+  const politicians = await personService.getTrendingPoliticians({
+    supabaseClient: resolveSupabaseClient(request),
+  });
+
+  response.json(politicians);
+}
+
 module.exports = {
   insertPerson,
+  getTrendingPoliticians,
 };
