@@ -83,7 +83,7 @@ async function insertPerson({ supabaseClient, payload, versionService }) {
   return data.person_id;
 }
 
-const TRENDING_COUNT = 2;
+const TRENDING_COUNT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Tried widest-last. The 7-day window is the intent; the wider ones exist so
 // the section still renders before the pipeline has a week of person links.
@@ -120,6 +120,8 @@ function toPublicPolitician(row) {
 }
 
 async function getTrendingPoliticians({ supabaseClient }) {
+  let widest = [];
+
   for (const days of TRENDING_WINDOWS_DAYS) {
     const { data, error } = await personRepository.trendingPoliticians({
       supabaseClient,
@@ -131,14 +133,20 @@ async function getTrendingPoliticians({ supabaseClient }) {
       throw new AppError(502, 'Failed to load trending politicians from Supabase', error);
     }
 
-    if ((data || []).length >= TRENDING_COUNT) {
-      return data.map(toPublicPolitician);
+    const rows = data || [];
+
+    if (rows.length >= TRENDING_COUNT) {
+      return rows.map(toPublicPolitician);
+    }
+
+    if (rows.length > widest.length) {
+      widest = rows;
     }
   }
 
-  // Fewer than TRENDING_COUNT people have ever appeared; the client hides the
-  // section rather than showing a lone politician.
-  return [];
+  // No window filled the carousel; show whoever the widest window found.
+  // Empty only when nobody has ever appeared -- the client hides the section.
+  return widest.map(toPublicPolitician);
 }
 
 module.exports = {

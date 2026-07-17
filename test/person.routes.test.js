@@ -95,7 +95,7 @@ test('POST /persons returns validation errors for invalid payloads', async () =>
   });
 });
 
-test('GET /politicians/trending returns the two trending politicians without raw counts', async () => {
+test('GET /politicians/trending returns the trending politicians without raw counts', async () => {
   const rows = [
     {
       person_id: 2,

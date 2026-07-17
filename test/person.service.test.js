@@ -249,13 +249,22 @@ const ROW_B = {
   appearances: 4,
 };
 
+const fillerRow = (personId) => ({
+  ...ROW_B,
+  person_id: personId,
+  name: `Person ${personId}`,
+});
+
+const FULL_WEEK = [ROW_A, ROW_B, fillerRow(3), fillerRow(4), fillerRow(5)];
+
 test('getTrendingPoliticians uses the 7-day window when it has enough people', async () => {
-  const supabaseClient = createTrendingClient({ windows: { week: [ROW_A, ROW_B] } });
+  const supabaseClient = createTrendingClient({ windows: { week: FULL_WEEK } });
 
   const result = await getTrendingPoliticians({ supabaseClient });
 
-  assert.equal(result.length, 2);
+  assert.equal(result.length, 5);
   assert.equal(supabaseClient.calls.length, 1, 'must not widen when the week suffices');
+  assert.equal(supabaseClient.calls[0][2], 5, 'asks for up to five people');
   assert.deepEqual(result[0], {
     person_id: 2,
     name: 'V D Satheesan',
@@ -270,7 +279,7 @@ test('getTrendingPoliticians uses the 7-day window when it has enough people', a
 });
 
 test('getTrendingPoliticians never exposes the raw appearance count', async () => {
-  const supabaseClient = createTrendingClient({ windows: { week: [ROW_A, ROW_B] } });
+  const supabaseClient = createTrendingClient({ windows: { week: FULL_WEEK } });
 
   const result = await getTrendingPoliticians({ supabaseClient });
 
@@ -280,14 +289,14 @@ test('getTrendingPoliticians never exposes the raw appearance count', async () =
   }
 });
 
-test('getTrendingPoliticians widens the window until two people are found', async () => {
+test('getTrendingPoliticians widens the window until the carousel is full', async () => {
   const supabaseClient = createTrendingClient({
-    windows: { week: [ROW_A], month: [], all: [ROW_A, ROW_B] },
+    windows: { week: [ROW_A, ROW_B], month: [ROW_A, ROW_B], all: FULL_WEEK },
   });
 
   const result = await getTrendingPoliticians({ supabaseClient });
 
-  assert.equal(result.length, 2);
+  assert.equal(result.length, 5);
   assert.equal(supabaseClient.calls.length, 3, 'tries 7d, then 30d, then all-time');
   assert.deepEqual(supabaseClient.calls.map((c) => c[0]), [
     'trending_politicians',
@@ -296,10 +305,31 @@ test('getTrendingPoliticians widens the window until two people are found', asyn
   ]);
 });
 
-test('getTrendingPoliticians returns nothing when fewer than two have ever appeared', async () => {
+test('getTrendingPoliticians falls back to the widest partial window', async () => {
+  const supabaseClient = createTrendingClient({
+    windows: { week: [ROW_A], month: [ROW_A, ROW_B], all: [ROW_A, ROW_B] },
+  });
+
+  const result = await getTrendingPoliticians({ supabaseClient });
+
+  assert.equal(result.length, 2, 'no window reached five, so the biggest result wins');
+  assert.equal(supabaseClient.calls.length, 3, 'still checks every window');
+});
+
+test('getTrendingPoliticians returns a lone politician when nobody else exists', async () => {
   const supabaseClient = createTrendingClient({ windows: { week: [ROW_A], all: [ROW_A] } });
 
+  const result = await getTrendingPoliticians({ supabaseClient });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].person_id, ROW_A.person_id);
+});
+
+test('getTrendingPoliticians returns nothing when nobody has ever appeared', async () => {
+  const supabaseClient = createTrendingClient({ windows: {} });
+
   assert.deepEqual(await getTrendingPoliticians({ supabaseClient }), []);
+  assert.equal(supabaseClient.calls.length, 3, 'exhausts every window first');
 });
 
 test('getTrendingPoliticians maps rpc failures to AppError', async () => {
