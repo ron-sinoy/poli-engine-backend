@@ -1,6 +1,9 @@
 'use strict';
 
+const { fetchAllPages, rankByCosine } = require('../lib/vectorMatch');
+
 const THREADS_TABLE = 'threads';
+const MATCH_PAGE_SIZE = 100;
 const THREAD_LIST_COLUMNS = 'thread_id,title,summary,updated_at';
 const THREAD_INTERNAL_COLUMNS = 'thread_id,title,summary,updated_at,vectors';
 const THREAD_DETAIL_COLUMNS = 'thread_id,title,summary,updated_at';
@@ -21,13 +24,25 @@ async function loadThreadsInternal({ supabaseClient }) {
     .order('updated_at', { ascending: false });
 }
 
-// Ranks in Postgres and returns only the top matches, so thread vectors never
-// cross the wire. Threads without a vector are skipped by the RPC.
+// Ranks in the backend: the live DB never got the match_threads RPC from
+// migration 002, so vectors are paged down and cosined here instead.
 async function matchThreads({ supabaseClient, queryVector, matchCount }) {
-  return supabaseClient.rpc('match_threads', {
-    query_vector: queryVector,
-    match_count: matchCount,
+  const { data, error } = await fetchAllPages({
+    pageSize: MATCH_PAGE_SIZE,
+    buildPageQuery: (from, to) =>
+      supabaseClient
+        .from(THREADS_TABLE)
+        .select('thread_id,title,summary,vectors')
+        .not('vectors', 'is', null)
+        .order('thread_id', { ascending: true })
+        .range(from, to),
   });
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  return { data: rankByCosine({ rows: data, queryVector, matchCount }), error: null };
 }
 
 async function insertThread({ supabaseClient, thread }) {

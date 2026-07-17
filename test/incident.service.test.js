@@ -94,15 +94,65 @@ function createIncidentClient({
   };
 }
 
+// Serves the paginated vector-match chain: select().not()...eq().order().range().
+// range() slices the rows so multi-page fetches terminate like PostgREST would.
+// missingColumns simulates the pre-migration-001 live schema: any select that
+// names source_url fails with 42703 the way Postgres would.
+function createWaitingListMatchClient({ rows = [], error = null, missingColumns = false } = {}) {
+  const calls = [];
+
+  return {
+    calls,
+    from(tableName) {
+      calls.push(['from', tableName]);
+      let selectedColumns = '';
+
+      const builder = {
+        select(columns) {
+          calls.push(['select', tableName, columns]);
+          selectedColumns = columns;
+          return builder;
+        },
+        not(column, operator, value) {
+          calls.push(['not', tableName, column, operator, value]);
+          return builder;
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return builder;
+        },
+        order(column, options) {
+          calls.push(['order', tableName, column, options]);
+          return builder;
+        },
+        range(fromIndex, toIndex) {
+          calls.push(['range', tableName, fromIndex, toIndex]);
+
+          if (missingColumns && selectedColumns.includes('source_url')) {
+            return Promise.resolve({
+              data: null,
+              error: { code: '42703', message: 'column waiting_list_incidents.source_url does not exist' },
+            });
+          }
+
+          if (error) {
+            return Promise.resolve({ data: null, error });
+          }
+
+          return Promise.resolve({ data: rows.slice(fromIndex, toIndex + 1), error: null });
+        },
+      };
+
+      return builder;
+    },
+  };
+}
+
 function createWaitingListIncidentClient({ data = [], error = null } = {}) {
   const calls = [];
 
   return {
     calls,
-    rpc(functionName, args) {
-      calls.push(['rpc', functionName, args]);
-      return Promise.resolve({ data, error });
-    },
     from(tableName) {
       calls.push(['from', tableName]);
 
@@ -252,38 +302,108 @@ test('insertIncident maps incident insert failures to AppError', async () => {
   );
 });
 
-test('matchWaitingListIncidents ranks in Postgres instead of reading every vector', async () => {
-  const incidents = [
-    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0.91 },
-    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 0.87 },
-  ];
-  const supabaseClient = createWaitingListIncidentClient({ data: incidents });
+test('matchWaitingListIncidents ranks waiting rows in the backend by cosine similarity', async () => {
+  const supabaseClient = createWaitingListMatchClient({
+    rows: [
+      { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', vectors: '[0,1]' },
+      { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', vectors: '[1,0]' },
+      // Wrong dimension (legacy placeholder): must be skipped, not scored.
+      { id: 3, content: 'Gamma', source_url: 'https://example.com/3', source_id: 'mt_#c', vectors: '[1,0,0]' },
+    ],
+  });
 
   const result = await matchWaitingListIncidents({
     supabaseClient,
-    payload: { vectors: [0.1, 0.2], match_count: 2 },
+    payload: { vectors: [1, 0], match_count: 2 },
   });
 
-  assert.deepEqual(result, incidents);
-  assert.deepEqual(supabaseClient.calls, [
-    ['rpc', 'match_waiting_list_incidents', { query_vector: [0.1, 0.2], match_count: 2 }],
+  assert.deepEqual(result, [
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 1 },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0 },
   ]);
-  // The whole point of the RPC: no table read, so no 3072-dim payload.
-  assert.ok(!supabaseClient.calls.some((call) => call[0] === 'from'));
+  // Only waiting rows that can still form a thread are eligible.
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'not' && call[2] === 'vectors' && call[3] === 'is' && call[4] === null
+    )
+  );
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'not' && call[2] === 'source_url' && call[3] === 'is' && call[4] === null
+    )
+  );
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) => call[0] === 'eq' && call[2] === 'status' && call[3] === 'waiting'
+    )
+  );
 });
 
 test('matchWaitingListIncidents defaults match_count to 3', async () => {
-  const supabaseClient = createWaitingListIncidentClient({ data: [] });
+  const supabaseClient = createWaitingListMatchClient({
+    rows: [
+      { id: 1, content: 'A', source_url: 'https://example.com/1', source_id: 'mt_#a', vectors: '[1,0]' },
+      { id: 2, content: 'B', source_url: 'https://example.com/2', source_id: 'mt_#b', vectors: '[1,1]' },
+      { id: 3, content: 'C', source_url: 'https://example.com/3', source_id: 'mt_#c', vectors: '[0,1]' },
+      { id: 4, content: 'D', source_url: 'https://example.com/4', source_id: 'mt_#d', vectors: '[-1,0]' },
+    ],
+  });
 
-  await matchWaitingListIncidents({ supabaseClient, payload: { vectors: [0.1, 0.2] } });
+  const result = await matchWaitingListIncidents({ supabaseClient, payload: { vectors: [1, 0] } });
 
-  assert.deepEqual(supabaseClient.calls, [
-    ['rpc', 'match_waiting_list_incidents', { query_vector: [0.1, 0.2], match_count: 3 }],
+  assert.deepEqual(result.map((row) => row.id), [1, 2, 3]);
+});
+
+test('matchWaitingListIncidents pages through more than one page of vectors', async () => {
+  const rows = Array.from({ length: 150 }, (_, index) => ({
+    id: index + 1,
+    content: `Incident ${index + 1}`,
+    source_url: `https://example.com/${index + 1}`,
+    source_id: `mt_#${index + 1}`,
+    vectors: '[1,0]',
+  }));
+  const supabaseClient = createWaitingListMatchClient({ rows });
+
+  const result = await matchWaitingListIncidents({ supabaseClient, payload: { vectors: [1, 0] } });
+
+  assert.equal(result.length, 3);
+  assert.deepEqual(
+    supabaseClient.calls
+      .filter((call) => call[0] === 'range')
+      .map((call) => [call[2], call[3]]),
+    [
+      [0, 99],
+      [100, 199],
+    ]
+  );
+});
+
+test('matchWaitingListIncidents falls back to the legacy schema when migration 001 columns are missing', async () => {
+  const supabaseClient = createWaitingListMatchClient({
+    missingColumns: true,
+    rows: [
+      { id: 1, content: 'Alpha', vectors: '[0,1]' },
+      { id: 2, content: 'Beta', vectors: '[1,0]' },
+    ],
+  });
+
+  const result = await matchWaitingListIncidents({
+    supabaseClient,
+    payload: { vectors: [1, 0], match_count: 2 },
+  });
+
+  assert.deepEqual(result, [
+    { id: 2, content: 'Beta', score: 1, source_url: null, source_id: null },
+    { id: 1, content: 'Alpha', score: 0, source_url: null, source_id: null },
   ]);
+  // The legacy retry selects only the columns that exist.
+  assert.ok(
+    supabaseClient.calls.some((call) => call[0] === 'select' && call[2] === 'id,content,vectors')
+  );
 });
 
 test('matchWaitingListIncidents rejects a missing query vector', async () => {
-  const supabaseClient = createWaitingListIncidentClient({ data: [] });
+  const supabaseClient = createWaitingListMatchClient({});
 
   await assert.rejects(
     () => matchWaitingListIncidents({ supabaseClient, payload: { match_count: 3 } }),
@@ -291,8 +411,8 @@ test('matchWaitingListIncidents rejects a missing query vector', async () => {
   );
 });
 
-test('matchWaitingListIncidents maps Supabase rpc failures to AppError', async () => {
-  const supabaseClient = createWaitingListIncidentClient({ error: { message: 'rpc failed' } });
+test('matchWaitingListIncidents maps Supabase read failures to AppError', async () => {
+  const supabaseClient = createWaitingListMatchClient({ error: { message: 'read failed' } });
 
   await assert.rejects(
     () => matchWaitingListIncidents({ supabaseClient, payload: { vectors: [0.1, 0.2] } }),
@@ -322,6 +442,89 @@ test('updateWaitingListStatus returns not found for an unknown id', async () => 
     () => updateWaitingListStatus({ supabaseClient, payload: { id: 404, status: 'completed' } }),
     (error) => error instanceof AppError && error.statusCode === 404
   );
+});
+
+test('updateWaitingListStatus deletes the row when the legacy schema has no status column', async () => {
+  const calls = [];
+  const supabaseClient = {
+    from(tableName) {
+      const builder = {
+        update(payload) {
+          calls.push(['update', tableName, payload]);
+          return builder;
+        },
+        delete() {
+          calls.push(['delete', tableName]);
+          return builder;
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return builder;
+        },
+        select(columns) {
+          calls.push(['select', tableName, columns]);
+          return builder;
+        },
+        limit() {
+          return builder;
+        },
+        maybeSingle() {
+          const wasDelete = calls.some((call) => call[0] === 'delete');
+
+          if (wasDelete) {
+            return Promise.resolve({ data: { id: 5 }, error: null });
+          }
+
+          return Promise.resolve({
+            data: null,
+            error: { code: 'PGRST204', message: "Could not find the 'status' column" },
+          });
+        },
+      };
+
+      return builder;
+    },
+  };
+
+  await updateWaitingListStatus({ supabaseClient, payload: { id: 5, status: 'completed' } });
+
+  assert.ok(calls.some((call) => call[0] === 'delete' && call[1] === 'waiting_list_incidents'));
+  assert.ok(calls.some((call) => call[0] === 'eq' && call[2] === 'id' && call[3] === 5));
+});
+
+test('insertWaitingList retries with only content and vectors on the legacy schema', async () => {
+  const inserts = [];
+  const supabaseClient = {
+    from() {
+      return {
+        insert(payload) {
+          inserts.push(payload);
+
+          if (inserts.length === 1) {
+            return Promise.resolve({
+              data: null,
+              error: { code: 'PGRST204', message: "Could not find the 'source_url' column" },
+            });
+          }
+
+          return Promise.resolve({ data: null, error: null });
+        },
+      };
+    },
+  };
+
+  await insertWaitingList({
+    supabaseClient,
+    payload: {
+      content: 'Alpha',
+      vectors: [0.1, 0.2],
+      source_url: 'https://example.com/alpha',
+      source_id: 'mt_#alpha',
+    },
+  });
+
+  assert.equal(inserts.length, 2);
+  assert.deepEqual(inserts[1], { content: 'Alpha', vectors: [0.1, 0.2] });
 });
 
 test('loadWaitingListIncidentsContent returns source_url so a row can be promoted to an incident', async () => {

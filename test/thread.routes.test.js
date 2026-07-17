@@ -7,18 +7,35 @@ const { invokeApp } = require('../test_utils/invokeApp');
 
 function createThreadsClient({ data, error = null }) {
   return {
-    rpc() {
-      return Promise.resolve({ data, error });
-    },
     from() {
-      return {
+      const rows = Array.isArray(data) ? data : [];
+      const result = Promise.resolve({ data, error });
+
+      // Thenable so a bare select().order() read resolves, but still chainable
+      // for the vector-match select().not().order().range() chain.
+      const builder = {
         select() {
-          return this;
+          return builder;
         },
-        async order() {
-          return { data, error };
+        not() {
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        range(fromIndex, toIndex) {
+          if (error) {
+            return Promise.resolve({ data: null, error });
+          }
+
+          return Promise.resolve({ data: rows.slice(fromIndex, toIndex + 1), error: null });
+        },
+        then(onFulfilled, onRejected) {
+          return result.then(onFulfilled, onRejected);
         },
       };
+
+      return builder;
     },
   };
 }
@@ -217,20 +234,23 @@ test('GET /threads/:id returns 404 when thread is missing', async () => {
 });
 
 test('POST /threads/match returns threads ranked by cosine similarity', async () => {
-  const matches = [
-    { thread_id: 986, title: 'Alpha', summary: 'Alpha summary', score: 0.93 },
-    { thread_id: 987, title: 'Beta', summary: 'Beta summary', score: 0.81 },
+  const threads = [
+    { thread_id: 986, title: 'Alpha', summary: 'Alpha summary', vectors: '[0,1]' },
+    { thread_id: 987, title: 'Beta', summary: 'Beta summary', vectors: '[1,0]' },
   ];
-  const app = createApp({ supabaseClient: createThreadsClient({ data: matches }) });
+  const app = createApp({ supabaseClient: createThreadsClient({ data: threads }) });
 
   const response = await invokeApp(app, {
     method: 'POST',
     url: '/threads/match',
-    body: { vectors: [0.1, 0.2], match_count: 2 },
+    body: { vectors: [1, 0], match_count: 2 },
   });
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, matches);
+  assert.deepEqual(response.body, [
+    { thread_id: 987, title: 'Beta', summary: 'Beta summary', score: 1 },
+    { thread_id: 986, title: 'Alpha', summary: 'Alpha summary', score: 0 },
+  ]);
 });
 
 test('POST /threads/match rejects a missing query vector', async () => {

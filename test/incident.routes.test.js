@@ -12,20 +12,43 @@ function createIncidentRouteClient({
   waitingListInsertError = null,
 }) {
   return {
-    rpc() {
-      return Promise.resolve({ data: waitingListIncidents, error: waitingListError });
-    },
     from(tableName) {
       return {
         tableName,
         wasUpdated: false,
         select() {
-          // An update chain keeps building; a bare read resolves immediately.
+          // An update chain keeps building; a bare read resolves immediately,
+          // but stays chainable for the vector-match not().eq().order().range().
           if (tableName === 'waiting_list_incidents' && !this.wasUpdated) {
-            return Promise.resolve({
+            const rows = Array.isArray(waitingListIncidents) ? waitingListIncidents : [];
+            const result = Promise.resolve({
               data: waitingListIncidents,
               error: waitingListError,
             });
+
+            const builder = {
+              not() {
+                return builder;
+              },
+              eq() {
+                return builder;
+              },
+              order() {
+                return builder;
+              },
+              range(fromIndex, toIndex) {
+                if (waitingListError) {
+                  return Promise.resolve({ data: null, error: waitingListError });
+                }
+
+                return Promise.resolve({ data: rows.slice(fromIndex, toIndex + 1), error: null });
+              },
+              then(onFulfilled, onRejected) {
+                return result.then(onFulfilled, onRejected);
+              },
+            };
+
+            return builder;
           }
 
           return this;
@@ -129,8 +152,8 @@ test('POST /incidents returns validation errors for invalid payloads', async () 
 
 test('POST /waitinglists/match returns the ranked waiting list incidents', async () => {
   const waitingListIncidents = [
-    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0.91 },
-    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 0.87 },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', vectors: '[0,1]' },
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', vectors: '[1,0]' },
   ];
   const app = createApp({
     supabaseClient: createIncidentRouteClient({ waitingListIncidents }),
@@ -139,11 +162,14 @@ test('POST /waitinglists/match returns the ranked waiting list incidents', async
   const response = await invokeApp(app, {
     method: 'POST',
     url: '/waitinglists/match',
-    body: { vectors: [0.1, 0.2], match_count: 2 },
+    body: { vectors: [1, 0], match_count: 2 },
   });
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, waitingListIncidents);
+  assert.deepEqual(response.body, [
+    { id: 2, content: 'Beta', source_url: 'https://example.com/2', source_id: 'mt_#b', score: 1 },
+    { id: 1, content: 'Alpha', source_url: 'https://example.com/1', source_id: 'mt_#a', score: 0 },
+  ]);
 });
 
 test('POST /waitinglists/update marks a waiting list row consumed', async () => {
