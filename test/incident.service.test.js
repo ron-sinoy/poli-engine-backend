@@ -6,10 +6,47 @@ const { AppError } = require('../src/errors/AppError');
 const {
   insertIncident,
   insertWaitingList,
+  loadBreakingNews,
   loadWaitingListIncidentsContent,
   matchWaitingListIncidents,
   updateWaitingListStatus,
 } = require('../src/services/incident.service');
+
+function createBreakingNewsClient({ entries = [], incidents = [], entriesError = null, incidentsError = null } = {}) {
+  const calls = [];
+
+  return {
+    calls,
+    from(tableName) {
+      calls.push(['from', tableName]);
+
+      const builder = {
+        select(columns) {
+          calls.push(['select', tableName, columns]);
+          return builder;
+        },
+        eq(column, value) {
+          calls.push(['eq', tableName, column, value]);
+          return builder;
+        },
+        order(column, options) {
+          calls.push(['order', tableName, column, options]);
+          return builder;
+        },
+        limit(count) {
+          calls.push(['limit', tableName, count]);
+          return Promise.resolve({ data: entries, error: entriesError });
+        },
+        in(column, values) {
+          calls.push(['in', tableName, column, values]);
+          return Promise.resolve({ data: incidents, error: incidentsError });
+        },
+      };
+
+      return builder;
+    },
+  };
+}
 
 function createIncidentClient({
   thread = { thread_id: 1, current_position: 2 },
@@ -550,6 +587,57 @@ test('loadWaitingListIncidentsContent maps Supabase read failures to AppError', 
 
   await assert.rejects(
     () => loadWaitingListIncidentsContent({ supabaseClient }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
+test('loadBreakingNews returns the latest added incidents in entry order', async () => {
+  const supabaseClient = createBreakingNewsClient({
+    entries: [
+      { entry_id: 24, published_at: '2026-07-17T10:30:00Z' },
+      { entry_id: 23, published_at: '2026-07-17T10:00:00Z' },
+    ],
+    incidents: [
+      { entry_id: 23, body: 'Earlier incident', source_url: 'https://example.com/23' },
+      { entry_id: 24, body: 'Latest incident', source_url: 'https://example.com/24' },
+    ],
+  });
+
+  const result = await loadBreakingNews({ supabaseClient });
+
+  assert.deepEqual(result, [
+    {
+      entry_id: 24,
+      body: 'Latest incident',
+      published_at: '2026-07-17T10:30:00Z',
+      source_url: 'https://example.com/24',
+    },
+    {
+      entry_id: 23,
+      body: 'Earlier incident',
+      published_at: '2026-07-17T10:00:00Z',
+      source_url: 'https://example.com/23',
+    },
+  ]);
+  assert.deepEqual(supabaseClient.calls, [
+    ['from', 'timeline_entries'],
+    ['select', 'timeline_entries', 'entry_id,published_at'],
+    ['eq', 'timeline_entries', 'entry_type', 'incident'],
+    ['order', 'timeline_entries', 'entry_id', { ascending: false }],
+    ['limit', 'timeline_entries', 5],
+    ['from', 'incidents'],
+    ['select', 'incidents', 'entry_id,body,source_url'],
+    ['in', 'incidents', 'entry_id', [24, 23]],
+  ]);
+});
+
+test('loadBreakingNews maps timeline-entry read failures to AppError', async () => {
+  const supabaseClient = createBreakingNewsClient({
+    entriesError: { message: 'read failed' },
+  });
+
+  await assert.rejects(
+    () => loadBreakingNews({ supabaseClient }),
     (error) => error instanceof AppError && error.statusCode === 502
   );
 });

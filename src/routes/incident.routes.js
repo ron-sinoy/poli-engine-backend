@@ -7,6 +7,7 @@ const { asyncHandler } = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.post('/incidents', asyncHandler(incidentController.insertIncident));
+router.get('/breaking-news', asyncHandler(incidentController.loadBreakingNews));
 router.post('/waitinglists', asyncHandler(incidentController.insertWaitingList));
 router.post('/waitinglists/match', asyncHandler(incidentController.matchWaitingListIncidents));
 router.post('/waitinglists/update', asyncHandler(incidentController.updateWaitingListStatus));

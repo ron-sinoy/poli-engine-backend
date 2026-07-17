@@ -59,10 +59,19 @@ async function loadContentWaitingListIncidents(request, response) {
   response.json(incidents);
 }
 
+async function loadBreakingNews(request, response) {
+  const incidents = await incidentService.loadBreakingNews({
+    supabaseClient: resolveSupabaseClient(request),
+  });
+
+  response.json(incidents);
+}
+
 module.exports = {
   insertIncident,
   insertWaitingList,
   matchWaitingListIncidents,
   updateWaitingListStatus,
   loadContentWaitingListIncidents,
+  loadBreakingNews,
 };

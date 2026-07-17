@@ -40,6 +40,24 @@ async function insertIncidentPersons({ supabaseClient, rows }) {
     .select('entry_id');
 }
 
+// entry_id is an auto-incremented identifier, so descending order reflects
+// when an incident was added, independent of the source article's date.
+async function loadLatestIncidentEntries({ supabaseClient, limit }) {
+  return supabaseClient
+    .from('timeline_entries')
+    .select('entry_id,published_at')
+    .eq('entry_type', 'incident')
+    .order('entry_id', { ascending: false })
+    .limit(limit);
+}
+
+async function loadIncidentBodiesByEntryIds({ supabaseClient, entryIds }) {
+  return supabaseClient
+    .from('incidents')
+    .select('entry_id,body,source_url')
+    .in('entry_id', entryIds);
+}
+
 async function insertWaitingList({ supabaseClient, waitingListRow }) {
   const inserted = await supabaseClient.from(WAITING_LIST_INCIDENTS_TABLE).insert(waitingListRow);
 
@@ -163,6 +181,8 @@ module.exports = {
   insertTimelineEntry,
   insertIncident,
   insertIncidentPersons,
+  loadLatestIncidentEntries,
+  loadIncidentBodiesByEntryIds,
   insertWaitingList,
   matchWaitingListIncidents,
   loadWaitingListIncidentsContent,

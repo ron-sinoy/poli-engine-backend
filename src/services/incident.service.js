@@ -4,6 +4,8 @@ const { AppError } = require('../errors/AppError');
 const incidentRepository = require('../repositories/incident.repository');
 const threadRepository = require('../repositories/thread.repository');
 
+const BREAKING_NEWS_LIMIT = 5;
+
 function requireNonEmptyString(value, fieldName) {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new AppError(422, `${fieldName} is required`);
@@ -143,6 +145,45 @@ async function loadWaitingListIncidentsContent({ supabaseClient }) {
   return data || [];
 }
 
+async function loadBreakingNews({ supabaseClient }) {
+  const { data: entries, error: entriesError } = await incidentRepository.loadLatestIncidentEntries({
+    supabaseClient,
+    limit: BREAKING_NEWS_LIMIT,
+  });
+
+  if (entriesError) {
+    throw new AppError(502, 'Failed to load latest incidents from Supabase', entriesError);
+  }
+
+  if (!entries?.length) {
+    return [];
+  }
+
+  const { data: incidents, error: incidentsError } = await incidentRepository.loadIncidentBodiesByEntryIds({
+    supabaseClient,
+    entryIds: entries.map((entry) => entry.entry_id),
+  });
+
+  if (incidentsError) {
+    throw new AppError(502, 'Failed to load breaking news content from Supabase', incidentsError);
+  }
+
+  const incidentsByEntryId = new Map((incidents || []).map((incident) => [incident.entry_id, incident]));
+
+  return entries.flatMap((entry) => {
+    const incident = incidentsByEntryId.get(entry.entry_id);
+
+    return incident?.body
+      ? [{
+          entry_id: entry.entry_id,
+          body: incident.body,
+          published_at: entry.published_at,
+          source_url: incident.source_url,
+        }]
+      : [];
+  });
+}
+
 async function insertIncident({ supabaseClient, payload }) {
   const incident = validateInsertIncidentPayload(payload);
   const thread = await loadThreadProgressOrFail({
@@ -229,6 +270,7 @@ async function insertWaitingList({ supabaseClient, payload }) {
 module.exports = {
   matchWaitingListIncidents,
   loadWaitingListIncidentsContent,
+  loadBreakingNews,
   updateWaitingListStatus,
   insertIncident,
   insertWaitingList,

@@ -24,6 +24,30 @@ Returns:
 { "ok": true }
 ```
 
+## GET /breaking-news
+
+Purpose:
+- Loads the most recently added incidents for the frontend breaking-news banner.
+
+User inputs:
+- None.
+
+Returns up to five incidents, newest first:
+
+```json
+[
+  {
+    "entry_id": 1,
+    "body": "string",
+    "published_at": "ISO timestamp",
+    "source_url": "string"
+  }
+]
+```
+
+Notes:
+- Recency is determined by descending `timeline_entries.entry_id`, which tracks insertion order.
+
 ## GET /cache
 
 Purpose:

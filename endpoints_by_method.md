@@ -2,6 +2,7 @@
 
 ## GET
 - `/health`
+- `/breaking-news`
 - `/cache`
 - `/sourceids`
 - `/version`

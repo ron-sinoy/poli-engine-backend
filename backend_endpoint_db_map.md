@@ -21,6 +21,16 @@ This file reflects the current backend implementation in `src/`.
 - Fetches:
   - None
 
+## GET /breaking-news
+
+- Inserts/updates:
+  - None
+- Fetches:
+  - `timeline_entries`: `entry_id`, `published_at`, filtered to `entry_type = 'incident'`, ordered by descending `entry_id`, limited to five
+  - `incidents`: `entry_id`, `body`, `source_url` for the selected entries
+- Response shaping notes:
+  - Returns the joined incident rows in timeline-entry order, newest first.
+
 ## GET /cache
 
 - Inserts/updates:

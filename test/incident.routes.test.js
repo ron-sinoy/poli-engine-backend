@@ -105,6 +105,32 @@ function createIncidentRouteClient({
   };
 }
 
+function createBreakingNewsRouteClient({ entries = [], incidents = [] } = {}) {
+  return {
+    from(tableName) {
+      const builder = {
+        select() {
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        limit() {
+          return Promise.resolve({ data: entries, error: null });
+        },
+        in() {
+          return Promise.resolve({ data: incidents, error: null });
+        },
+      };
+
+      return builder;
+    },
+  };
+}
+
 test('POST /incidents inserts an incident and returns the new entry_id', async () => {
   const app = createApp({
     supabaseClient: createIncidentRouteClient({ entryId: 11 }),
@@ -148,6 +174,27 @@ test('POST /incidents returns validation errors for invalid payloads', async () 
   assert.deepEqual(response.body, {
     error: 'persons_involved must be an array',
   });
+});
+
+test('GET /breaking-news returns the latest incident feed', async () => {
+  const app = createApp({
+    supabaseClient: createBreakingNewsRouteClient({
+      entries: [{ entry_id: 12, published_at: '2026-07-17T10:30:00Z' }],
+      incidents: [{ entry_id: 12, body: 'Latest incident', source_url: 'https://example.com/12' }],
+    }),
+  });
+
+  const response = await invokeApp(app, { method: 'GET', url: '/breaking-news' });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, [
+    {
+      entry_id: 12,
+      body: 'Latest incident',
+      published_at: '2026-07-17T10:30:00Z',
+      source_url: 'https://example.com/12',
+    },
+  ]);
 });
 
 test('POST /waitinglists/match returns the ranked waiting list incidents', async () => {
