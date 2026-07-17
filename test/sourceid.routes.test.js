@@ -9,6 +9,7 @@ function createSourceidRouteClient({
   sourceids = [],
   loadError = null,
   insertError = null,
+  existingRow = null,
   updateError = null,
   updateData = { source_id: 17, status: 'complete' },
 }) {
@@ -18,17 +19,32 @@ function createSourceidRouteClient({
         select() {
           const result = { data: sourceids, error: loadError };
 
-          // Thenable so a bare select resolves, but still chainable for .in().
+          // Thenable so a bare select resolves, but still chainable for .in()
+          // and for the existence check's .eq().limit().maybeSingle().
           return {
             in() {
               return Promise.resolve(result);
+            },
+            eq() {
+              return {
+                limit() {
+                  return {
+                    maybeSingle() {
+                      return Promise.resolve({
+                        data: existingRow,
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
             },
             then(onFulfilled, onRejected) {
               return Promise.resolve(result).then(onFulfilled, onRejected);
             },
           };
         },
-        upsert() {
+        insert() {
           return Promise.resolve({
             data: null,
             error: insertError,

@@ -13,12 +13,23 @@ async function loadSourceidsByIds({ supabaseClient, sourceIds }) {
     .in('source_id', sourceIds);
 }
 
-// Upsert, so a re-run cannot add a second row for an id it already claimed.
-// Relies on the unique index from migration 003.
+// Check-then-insert, so a re-run cannot add a second row for an id it already
+// claimed. The live DB has no unique index on source_id (migration 003 is
+// unapplied), so ON CONFLICT upserts fail there with 42P10; if the id already
+// has rows — even duplicates — the first one wins and the insert is skipped.
 async function insertSourceid({ supabaseClient, metadata }) {
-  return supabaseClient
+  const existing = await supabaseClient
     .from('pipeline_metadata')
-    .upsert(metadata, { onConflict: 'source_id', ignoreDuplicates: true });
+    .select('source_id,status')
+    .eq('source_id', metadata.source_id)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing.error || existing.data) {
+    return existing;
+  }
+
+  return supabaseClient.from('pipeline_metadata').insert(metadata);
 }
 
 async function updateSourceid({ supabaseClient, metadata }) {

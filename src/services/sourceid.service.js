@@ -100,7 +100,16 @@ async function updateSourceid({ supabaseClient, payload }) {
   }
 
   if (!data) {
-    throw new AppError(404, 'source_id was not found in pipeline_metadata');
+    // Nothing to update: the id was never inserted (crashed run, fresh DB),
+    // so add the row automatically instead of failing with 404.
+    const { error: insertError } = await sourceidRepository.insertSourceid({
+      supabaseClient,
+      metadata,
+    });
+
+    if (insertError) {
+      throw new AppError(502, 'Failed to insert source_id into Supabase', insertError);
+    }
   }
 }
 

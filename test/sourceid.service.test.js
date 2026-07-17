@@ -14,6 +14,8 @@ function createSourceidClient({
   sourceids = [],
   loadError = null,
   insertError = null,
+  existingRow = null,
+  existingCheckError = null,
   updateError = null,
   updateData = { source_id: 17, status: 'complete' },
 }) {
@@ -30,19 +32,40 @@ function createSourceidClient({
 
           const result = { data: sourceids, error: loadError };
 
-          // Thenable so a bare select resolves, but still chainable for .in().
+          // Thenable so a bare select resolves, but still chainable for .in()
+          // and for the existence check's .eq().limit().maybeSingle().
           return {
             in(column, values) {
               calls.push(['in', tableName, column, values]);
               return Promise.resolve(result);
+            },
+            eq(columnName, value) {
+              calls.push(['eq', tableName, columnName, value]);
+
+              return {
+                limit(limitValue) {
+                  calls.push(['limit', tableName, limitValue]);
+
+                  return {
+                    maybeSingle() {
+                      calls.push(['maybeSingle', tableName]);
+
+                      return Promise.resolve({
+                        data: existingRow,
+                        error: existingCheckError,
+                      });
+                    },
+                  };
+                },
+              };
             },
             then(onFulfilled, onRejected) {
               return Promise.resolve(result).then(onFulfilled, onRejected);
             },
           };
         },
-        upsert(payload, options) {
-          calls.push(['upsert', tableName, payload, options]);
+        insert(payload) {
+          calls.push(['insert', tableName, payload]);
 
           return Promise.resolve({
             data: null,
@@ -118,7 +141,7 @@ test('loadSourceids maps Supabase read failures to AppError', async () => {
   );
 });
 
-test('insertSourceid upserts so a re-run cannot add a second row for the same id', async () => {
+test('insertSourceid inserts only after the existence check finds no row', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
@@ -131,12 +154,33 @@ test('insertSourceid upserts so a re-run cannot add a second row for the same id
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['upsert', 'pipeline_metadata', { source_id: 17, status: 'pending' }, { onConflict: 'source_id', ignoreDuplicates: true }],
+    ['select', 'pipeline_metadata', 'source_id,status'],
+    ['eq', 'pipeline_metadata', 'source_id', 17],
+    ['limit', 'pipeline_metadata', 1],
+    ['maybeSingle', 'pipeline_metadata'],
+    ['from', 'pipeline_metadata'],
+    ['insert', 'pipeline_metadata', { source_id: 17, status: 'pending' }],
   ]);
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
-test('insertSourceid trims and upserts string source_id and status values', async () => {
+test('insertSourceid skips the insert when a row already exists for the id', async () => {
+  const supabaseClient = createSourceidClient({
+    existingRow: { source_id: 17, status: 'completed' },
+  });
+
+  await insertSourceid({
+    supabaseClient,
+    payload: {
+      source_id: 17,
+      status: 'pending',
+    },
+  });
+
+  assert.ok(!supabaseClient.calls.some((call) => call[0] === 'insert'));
+});
+
+test('insertSourceid trims and inserts string source_id and status values', async () => {
   const supabaseClient = createSourceidClient({});
 
   await insertSourceid({
@@ -149,7 +193,12 @@ test('insertSourceid trims and upserts string source_id and status values', asyn
 
   assert.deepEqual(supabaseClient.calls, [
     ['from', 'pipeline_metadata'],
-    ['upsert', 'pipeline_metadata', { source_id: 'abc-123', status: 'complete' }, { onConflict: 'source_id', ignoreDuplicates: true }],
+    ['select', 'pipeline_metadata', 'source_id,status'],
+    ['eq', 'pipeline_metadata', 'source_id', 'abc-123'],
+    ['limit', 'pipeline_metadata', 1],
+    ['maybeSingle', 'pipeline_metadata'],
+    ['from', 'pipeline_metadata'],
+    ['insert', 'pipeline_metadata', { source_id: 'abc-123', status: 'complete' }],
   ]);
 });
 
@@ -223,6 +272,24 @@ test('insertSourceid maps Supabase insert failures to AppError', async () => {
   );
 });
 
+test('insertSourceid maps existence-check failures to AppError', async () => {
+  const supabaseClient = createSourceidClient({
+    existingCheckError: { message: 'read failed' },
+  });
+
+  await assert.rejects(
+    () =>
+      insertSourceid({
+        supabaseClient,
+        payload: {
+          source_id: 17,
+          status: 'pending',
+        },
+      }),
+    (error) => error instanceof AppError && error.statusCode === 502
+  );
+});
+
 test('updateSourceid updates source_id status in pipeline_metadata without updating version_id', async () => {
   const supabaseClient = createSourceidClient({});
 
@@ -245,9 +312,34 @@ test('updateSourceid updates source_id status in pipeline_metadata without updat
   assert.ok(!supabaseClient.calls.some((call) => call[1] === 'version_log'));
 });
 
-test('updateSourceid returns 404 when source_id is missing', async () => {
+test('updateSourceid inserts the row automatically when source_id is missing', async () => {
   const supabaseClient = createSourceidClient({
     updateData: null,
+  });
+
+  await updateSourceid({
+    supabaseClient,
+    payload: {
+      source_id: 999,
+      status: 'complete',
+    },
+  });
+
+  assert.ok(
+    supabaseClient.calls.some(
+      (call) =>
+        call[0] === 'insert' &&
+        call[1] === 'pipeline_metadata' &&
+        call[2].source_id === 999 &&
+        call[2].status === 'complete'
+    )
+  );
+});
+
+test('updateSourceid maps insert failures of the automatic add to AppError', async () => {
+  const supabaseClient = createSourceidClient({
+    updateData: null,
+    insertError: { message: 'insert failed' },
   });
 
   await assert.rejects(
@@ -259,10 +351,7 @@ test('updateSourceid returns 404 when source_id is missing', async () => {
           status: 'complete',
         },
       }),
-    (error) =>
-      error instanceof AppError &&
-      error.statusCode === 404 &&
-      error.message === 'source_id was not found in pipeline_metadata'
+    (error) => error instanceof AppError && error.statusCode === 502
   );
 });
 
